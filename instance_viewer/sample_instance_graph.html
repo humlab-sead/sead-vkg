@@ -46,7 +46,7 @@
   }
 
   html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial}
-  .wrap{display:grid;grid-template-rows:auto auto 1fr;gap:12px;min-height:100%}
+  .wrap{display:grid;grid-template-rows:auto auto 1fr auto;gap:12px;min-height:100%}
   header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--header-gradient);}
   header h1{font-size:16px;margin:0 8px 0 0;color:var(--ink)}
   .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 12px 4px}
@@ -55,7 +55,9 @@
   .controls button:hover{background:var(--chip);}
   .controls input[type="file"]{padding:4px 8px}
   .controls input[type="text"]{height:36px;min-width:260px}
-  #cy{height:calc(100vh - 220px);min-height:460px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .main-area{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:0 12px;min-height:500px}
+  .sidebar{display:flex;flex-direction:column;gap:12px}
+  #cy{border:1px solid var(--border)}
   .side{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:0 12px 12px}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px}
   .panel h3{margin:0 0 8px 0;font-size:13px;color:var(--ink-dim);letter-spacing:.2px}
@@ -76,8 +78,6 @@
 </style>
 <!-- libs -->
 <script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
-<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-<script src="https://unpkg.com/cytoscape-dagre@2/cytoscape-dagre.js"></script>
 <script src="https://unpkg.com/@popperjs/core@2"></script>
 <script src="https://unpkg.com/tippy.js@6/dist/tippy-bundle.umd.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/scale.css"/>
@@ -93,41 +93,30 @@
       <input type="file" id="file" accept=".json,.txt,.csv" title="Load JSON file" />
       <button id="btnLoad">Load from textbox</button>
       <button id="btnDemo">Load demo</button>
-      <select id="layoutSelect" title="Choose layout algorithm">
-        <option value="database-schema">Database Schema (Fixed positions)</option>
-        <option value="dagre">Dagre (Hierarchical)</option>
-        <option value="grid">Grid</option>
-        <option value="circle">Circle</option>
-        <option value="concentric">Concentric</option>
-        <option value="breadthfirst">Breadth First</option>
-        <option value="cose">CoSE (Force-directed)</option>
-        <option value="entity-radial">Entity-Radial (Properties around entities)</option>
-        <option value="spaced-grid">Spaced Grid (Maximum spacing)</option>
-        <option value="random">Random</option>
-        <option value="preset">Preset (Current positions)</option>
-      </select>
-      <button id="btnLayout">Apply Layout</button>
       <button id="btnPng">Export PNG</button>
       <button id="btnDebug">Debug Nodes</button>
+      <label class="chip">
+        <input type="checkbox" id="chkHideEdgeLabels"> Hide edge labels
+      </label>
       <input id="q" type="text" placeholder="Search node text… (regex ok)" />
     </div>
 
-    <div class="side">
-      <div class="panel">
-        <h3>Paste JSON here (works with raw object, or the Postgres string you pasted)</h3>
-        <textarea id="json" placeholder='{"nodes":[...],"edges":[...]}'></textarea>
-        <div class="hint">Tips: If your SQL client wraps the JSON in a column (e.g. <code>"jsonb_build_object"</code> with a long quoted string), you can paste that entire blob here too—this viewer will extract and parse it.</div>
+    <div class="main-area">
+      <div class="sidebar">
+        <div class="panel">
+          <h3>Paste JSON here (works with raw object, or the Postgres string you pasted)</h3>
+          <textarea id="json" placeholder='{"nodes":[...],"edges":[...]}'></textarea>
+          <div class="hint">Tips: If your SQL client wraps the JSON in a column (e.g. <code>"jsonb_build_object"</code> with a long quoted string), you can paste that entire blob here too—this viewer will extract and parse it.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Filters</h3>
+          <div class="chips" id="filters"></div>
+        </div>
       </div>
 
-      <div class="panel">
-        <h3>Legend & Filters</h3>
-        <div id="legend" class="legend"></div>
-        <hr style="border-color:#0002"/>
-        <div class="chips" id="filters"></div>
-      </div>
+      <div id="cy"></div>
     </div>
-
-    <div id="cy"></div>
 
     <div class="side">
       <div class="panel">
@@ -143,13 +132,11 @@
       </div>
     </div>
 
-    <div class="footer">Layout: Dagre (directed). Drag to rearrange; use Search to highlight matches. PNG export renders the current viewport.
+    <div class="footer">Layout: Database Schema (fixed positions). Drag to rearrange; use Search to highlight matches. PNG export renders the current viewport.
     </div>
   </div>
 
 <script>
-// Note: Dagre extension will be registered when the libraries are fully loaded
-
 // ---- Palette per entity (works in both light and dark modes) ----
 const palette = {
   Site:        '#FDE68A',  // Light amber
@@ -201,6 +188,22 @@ function updateCytoscapeStyles() {
     .style({
       'line-color': getCSSVar('--accent'),
       'target-arrow-color': getCSSVar('--accent')
+    })
+    .update();
+}
+
+// Function to toggle edge labels visibility
+function toggleEdgeLabels(hide) {
+  if (!cy) return;
+  
+  cy.style()
+    .selector('edge[edgeType = "relationship"]')
+    .style({
+      'label': hide ? '' : 'data(rel)'
+    })
+    .selector('edge[edgeType = "property"]')
+    .style({
+      'label': hide ? '' : 'data(rel)'
     })
     .update();
 }
@@ -301,26 +304,25 @@ function buildLegendAndFilters(graph){
   // Remove 'Property' from entity set since we don't want to filter properties
   entSet.delete('Property');
   
-  console.log('=== BUILDING LEGEND ===');
+  console.log('=== BUILDING FILTERS ===');
   console.log('Input graph nodes:', graph.nodes?.length || 0);
   console.log('Unique entities found:', [...entSet].sort());
   
-  const legend = document.getElementById('legend');
   const filters = document.getElementById('filters');
-  legend.innerHTML = '';
+  if (!filters) {
+    console.error('Filters element not found');
+    return;
+  }
   filters.innerHTML = '';
   
   [...entSet].sort().forEach(ent=>{
     const color = palette[ent] || '#eee';
-    const item = document.createElement('div');
-    item.className='item';
-    item.innerHTML = `<span class="swatch" style="background:${color}"></span> <span>${ent}</span>`;
-    legend.appendChild(item);
-
+    
+    // Create filter chip with colored indicator (merging legend and filter)
     const chip = document.createElement('label');
     chip.className = 'chip';
     const id = 'f_'+ent;
-    chip.innerHTML = `<input type="checkbox" id="${id}" checked> ${ent}`;
+    chip.innerHTML = `<input type="checkbox" id="${id}" checked> <span class="swatch" style="background:${color}"></span> ${ent}`;
     
     // Debug: Check if Site nodes are found when creating filter
     if (ent === 'Site') {
@@ -358,7 +360,7 @@ function buildLegendAndFilters(graph){
   // Add a special filter for properties
   const propChip = document.createElement('label');
   propChip.className = 'chip';
-  propChip.innerHTML = `<input type="checkbox" id="f_properties" checked> Properties`;
+  propChip.innerHTML = `<input type="checkbox" id="f_properties" checked> <span class="swatch" style="background:#e5e7eb"></span> Properties`;
   propChip.querySelector('input').addEventListener('change', (ev)=>{
     const show = ev.target.checked;
     const propNodes = cy.$('node[nodeType = "property"]');
@@ -425,376 +427,111 @@ function attachTooltips(){
   });
 }
 
-function getLayoutOptions(layoutName) {
-  const baseOptions = {
+function getDatabaseSchemaLayout() {
+  return {
+    name: 'preset',
     animate: true,
-    animationDuration: 500,
+    animationDuration: 800,
     fit: true,
-    padding: 20
-  };
-
-  switch (layoutName) {
-    case 'database-schema':
-      return {
-        ...baseOptions,
-        name: 'preset',
-        animate: true,
-        animationDuration: 800,
-        fit: true,
-        padding: 60,
-        positions: function(node) {
-          // Define fixed positions based on entity types
-          const positions = {
-            // Core hierarchy - left side
-            Site: { x: 0, y: 0 },
-            SampleGroup: { x: 0, y: 150 },
-            Sample: { x: 0, y: 300 },
-            
-            // Locations - top left
-            Location: { x: -200, y: -100 },
-            
-            // Analysis branch - center
-            Analysis: { x: 200, y: 250 },
-            Dataset: { x: 200, y: 400 },
-            
-            // Analysis values and classifications - right side
-            AnalysisValue: { x: 400, y: 150 },
-            ValueClass: { x: 600, y: 150 },
-            
-            // Taxonomic data - bottom right
-            TaxonCount: { x: 400, y: 350 },
-            Taxon: { x: 600, y: 350 },
-            
-            // Measured values - bottom center
-            MeasuredValue: { x: 300, y: 400 },
-            
-            // Methods and bibliography - far right
-            Method: { x: 800, y: 0 },
-            Bibliography: { x: 800, y: 100 },
-            
-            // Projects - top right
-            Project: { x: 400, y: -50 }
-          };
-          
-          const nodeType = node.data('nodeType');
-          const entity = node.data('entity');
-          
-          if (nodeType === 'entity') {
-            // Position entity nodes
-            let basePos = positions[entity] || { x: 0, y: 500 };
-            
-            // If multiple nodes of same entity type, we'll spread them out
-            // For now, just return the base position - spreading will be handled after layout
-            return {
-              x: basePos.x,
-              y: basePos.y
-            };
-          } else if (nodeType === 'property') {
-            // Properties will be positioned around their parent entities after the layout runs
-            return { x: 0, y: 0 }; // Temporary position
-          }
-          
-          return { x: 0, y: 0 }; // Default fallback
-        }
+    padding: 60,
+    positions: function(node) {
+      // Define fixed positions based on entity types
+      const positions = {
+        // Core hierarchy - left side
+        Site: { x: 0, y: 0 },
+        SampleGroup: { x: 0, y: 150 },
+        Sample: { x: 0, y: 300 },
+        
+        // Locations - top left
+        Location: { x: -200, y: -100 },
+        
+        // Analysis branch - center
+        Analysis: { x: 200, y: 250 },
+        Dataset: { x: 200, y: 400 },
+        
+        // Analysis values and classifications - right side
+        AnalysisValue: { x: 400, y: 150 },
+        ValueClass: { x: 600, y: 150 },
+        
+        // Taxonomic data - bottom right
+        TaxonCount: { x: 400, y: 350 },
+        Taxon: { x: 600, y: 350 },
+        
+        // Measured values - bottom center
+        MeasuredValue: { x: 300, y: 400 },
+        
+        // Methods and bibliography - far right
+        Method: { x: 800, y: 0 },
+        Bibliography: { x: 800, y: 100 },
+        
+        // Projects - top right
+        Project: { x: 400, y: -50 }
       };
-    case 'dagre':
-      // Register dagre extension if not already registered
-      if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
-        try {
-          cytoscape.use(dagre);
-        } catch (e) {
-          // Already registered or error - continue anyway
-        }
+      
+      const nodeType = node.data('nodeType');
+      const entity = node.data('entity');
+      
+      if (nodeType === 'entity') {
+        // Position entity nodes
+        let basePos = positions[entity] || { x: 0, y: 500 };
+        
+        // If multiple nodes of same entity type, we'll spread them out
+        // For now, just return the base position - spreading will be handled after layout
+        return {
+          x: basePos.x,
+          y: basePos.y
+        };
+      } else if (nodeType === 'property') {
+        // Properties will be positioned around their parent entities after the layout runs
+        return { x: 0, y: 0 }; // Temporary position
       }
-      return {
-        ...baseOptions,
-        name: 'dagre',
-        rankDir: 'LR',
-        align: 'UL',
-        nodeSep: 20,
-        rankSep: 60,
-        edgeSep: 10,
-        ranker: 'tight-tree'
-      };
-    case 'grid':
-      return {
-        ...baseOptions,
-        name: 'grid',
-        rows: undefined,
-        cols: undefined,
-        position: function(node) { return { row: node.data('row'), col: node.data('col') }; },
-        sort: undefined,
-        animate: false
-      };
-    case 'circle':
-      return {
-        ...baseOptions,
-        name: 'circle',
-        radius: undefined,
-        spacingFactor: 1.5,
-        startAngle: -Math.PI / 2
-      };
-    case 'concentric':
-      return {
-        ...baseOptions,
-        name: 'concentric',
-        concentric: function(node) {
-          // Entity nodes in center, properties on outside
-          return node.data('nodeType') === 'entity' ? 2 : 1;
-        },
-        levelWidth: function(nodes) { return nodes.maxDegree() / 4; },
-        spacingFactor: 2,
-        minNodeSpacing: 50
-      };
-    case 'breadthfirst':
-      return {
-        ...baseOptions,
-        name: 'breadthfirst',
-        directed: true,
-        spacingFactor: 1.5,
-        maximal: false,
-        grid: false
-      };
-    case 'cose':
-      return {
-        ...baseOptions,
-        name: 'cose',
-        padding: 60, // More padding for less compression
-        // Pre-position properties around their entities before physics
-        ready: function() {
-          if (!cy) return;
-          cy.nodes('[nodeType = "entity"]').forEach(function(node) {
-            // Find all property nodes connected to this entity
-            const propertyEdges = node.connectedEdges('[edgeType = "property"]');
-            const propertyNodes = propertyEdges.connectedNodes('[nodeType = "property"]');
-            
-            if (propertyNodes.length > 0) {
-              const centerPos = node.position();
-              const radius = Math.min(45, Math.max(30, 50 - propertyNodes.length * 1.5)); // Adaptive closer radius
-              const angleStep = (2 * Math.PI) / propertyNodes.length;
-              const startAngle = Math.random() * Math.PI; // Some randomness
-              
-              propertyNodes.forEach(function(propNode, index) {
-                const angle = startAngle + (angleStep * index);
-                const x = centerPos.x + radius * Math.cos(angle);
-                const y = centerPos.y + radius * Math.sin(angle);
-                propNode.position({ x: x, y: y });
-              });
-            }
-          });
-        },
-        nodeRepulsion: function(node) { 
-          // Much stronger repulsion for entities to spread them out
-          return node.data('nodeType') === 'property' ? 400 : 15000; 
-        },
-        nodeOverlap: 20, // More space between nodes
-        idealEdgeLength: function(edge) { 
-          // Very short for properties, much longer for relationships
-          return edge.data('edgeType') === 'property' ? 15 : 300; 
-        },
-        edgeElasticity: function(edge) { 
-          // Very high elasticity to keep properties close
-          return edge.data('edgeType') === 'property' ? 3000 : 50; 
-        },
-        nestingFactor: 1.1,
-        gravity: 30, // Lower gravity to reduce center clustering
-        numIter: 2500, // More iterations for better settling
-        initialTemp: 800,
-        coolingFactor: 0.98,
-        minTemp: 1.0,
-        randomize: false,
-        componentSpacing: 150 // More space between disconnected components
-      };
-    case 'entity-radial':
-      return {
-        ...baseOptions,
-        name: 'preset',
-        animate: true,
-        animationDuration: 800,
-        fit: true,
-        padding: 50, // More padding for less compressed graph
-        positions: function(node) {
-          // Let the algorithm calculate all positions
-          return undefined;
-        },
-        // Custom positioning logic
-        ready: function() {
-          if (!cy) return;
-          const entityNodes = cy.nodes('[nodeType = "entity"]');
-          const propertyNodes = cy.nodes('[nodeType = "property"]');
-          
-          // First, run a spacious layout for entities only
-          const entityLayout = entityNodes.layout({
-            name: 'breadthfirst',
-            directed: true,
-            spacingFactor: 3, // Much more spacing
-            avoidOverlap: true,
-            nodeDimensionsIncludeLabels: true,
-            animate: false,
-            fit: false
-          });
-          
-          entityLayout.run();
-          
-          // Wait for entity layout to complete, then position properties
-          entityLayout.one('layoutstop', function() {
-            entityNodes.forEach(function(entityNode) {
-              const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
-              const propNodes = propEdges.connectedNodes('[nodeType = "property"]');
-              
-              if (propNodes.length > 0) {
-                const centerPos = entityNode.position();
-                const radius = Math.min(50, Math.max(35, 50 - propNodes.length * 2)); // Adaptive radius: closer for many properties
-                const angleStep = (2 * Math.PI) / propNodes.length;
-                const startAngle = Math.random() * Math.PI * 2; // Random start angle for variety
-                
-                propNodes.forEach(function(propNode, index) {
-                  const angle = startAngle + (angleStep * index);
-                  const x = centerPos.x + radius * Math.cos(angle);
-                  const y = centerPos.y + radius * Math.sin(angle);
-                  propNode.position({ x: x, y: y });
-                });
-              }
-            });
-            
-            // Final fit with more padding for less compression
-            cy.fit(cy.elements(), 80);
-            
-            // Optional: Add a gentle animation to settle any overlaps
-            setTimeout(() => {
-              cy.animate({
-                fit: { eles: cy.elements(), padding: 60 }
-              }, {
-                duration: 500
-              });
-            }, 200);
-          });
-        }
-      };
-    case 'spaced-grid':
-      return {
-        ...baseOptions,
-        name: 'preset',
-        animate: true,
-        animationDuration: 1000,
-        fit: true,
-        padding: 80,
-        ready: function() {
-          if (!cy) return;
-          const entityNodes = cy.nodes('[nodeType = "entity"]');
-          const propertyNodes = cy.nodes('[nodeType = "property"]');
-          
-          // Calculate grid dimensions for entities
-          const entityCount = entityNodes.length;
-          const cols = Math.ceil(Math.sqrt(entityCount));
-          const rows = Math.ceil(entityCount / cols);
-          
-          // Large spacing between entities
-          const cellWidth = 300;
-          const cellHeight = 250;
-          const startX = -(cols * cellWidth) / 2;
-          const startY = -(rows * cellHeight) / 2;
-          
-          // Position entities in a spacious grid
-          entityNodes.forEach(function(node, index) {
-            const col = index % cols;
-            const row = Math.floor(index / cols);
-            const x = startX + (col * cellWidth) + (cellWidth / 2);
-            const y = startY + (row * cellHeight) + (cellHeight / 2);
-            node.position({ x: x, y: y });
-          });
-          
-          // Position properties very close to their entities
-          entityNodes.forEach(function(entityNode) {
-            const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
-            const propNodes = propEdges.connectedNodes('[nodeType = "property"]');
-            
-            if (propNodes.length > 0) {
-              const centerPos = entityNode.position();
-              const radius = 35; // Very close to entity
-              const angleStep = (2 * Math.PI) / propNodes.length;
-              
-              propNodes.forEach(function(propNode, index) {
-                const angle = angleStep * index;
-                const x = centerPos.x + radius * Math.cos(angle);
-                const y = centerPos.y + radius * Math.sin(angle);
-                propNode.position({ x: x, y: y });
-              });
-            }
-          });
-          
-          // Fit with generous padding
-          cy.fit(cy.elements(), 100);
-        }
-      };
-    case 'random':
-      return {
-        ...baseOptions,
-        name: 'random'
-      };
-    case 'preset':
-      return {
-        ...baseOptions,
-        name: 'preset',
-        positions: undefined,
-        zoom: undefined,
-        pan: undefined,
-        animate: false
-      };
-    default:
-      return {
-        ...baseOptions,
-        name: 'grid'
-      };
-  }
-}
-
-// Function to ensure all nodes are visible (simpler version for non-database layouts)
-function ensureNodesVisible() {
-  if (!cy) return;
-  
-  console.log('Ensuring all nodes are visible...');
-  console.log('Total nodes:', cy.nodes().length);
-  
-  let fixedCount = 0;
-  cy.nodes().forEach(function(node) {
-    const pos = node.position();
-    if (!pos || (pos.x === 0 && pos.y === 0) || isNaN(pos.x) || isNaN(pos.y)) {
-      // Give nodes without proper positions a default position
-      node.position({ x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 });
-      fixedCount++;
-      console.log('Fixed position for node:', node.id(), node.data('entity') || node.data('label'));
+      
+      return { x: 0, y: 0 }; // Default fallback
     }
-  });
-  
-  console.log('Fixed positions for', fixedCount, 'nodes');
-  
-  // Fit the view to show all nodes
-  if (fixedCount > 0) {
-    cy.fit(cy.elements(), 50);
-  }
+  };
 }
 
 // Function to apply database schema positioning
 function applyDatabaseSchemaPositioning() {
   if (!cy) return;
   
-  console.log('Applying database schema positioning...');
+  console.log('=== APPLYING DATABASE SCHEMA POSITIONING ===');
   console.log('Total nodes:', cy.nodes().length);
   console.log('Entity nodes:', cy.nodes('[nodeType = "entity"]').length);
   console.log('Property nodes:', cy.nodes('[nodeType = "property"]').length);
   
-  // Ensure all nodes are visible first
-  cy.nodes().forEach(function(node) {
-    const pos = node.position();
-    if (!pos || (pos.x === 0 && pos.y === 0)) {
-      // Give nodes without proper positions a default position
-      node.position({ x: Math.random() * 200, y: Math.random() * 200 });
-      console.log('Fixed position for node:', node.id(), node.data('entity'));
-    }
-  });
+  // Define positions for each entity type
+  const positions = {
+    // Left column - core hierarchy
+    Site: { x: 0, y: 0 },
+    SampleGroup: { x: 0, y: 200 },
+    Sample: { x: 0, y: 400 },
+    Project: { x: 0, y: 710 }, // Aligned with last Dataset (590 + 120 spacing)
+    
+    // Far left - Methods (vertically aligned with Dataset, halfway between Location and Site)
+    Method: { x: -120, y: 590 }, // Halfway between Location (-240) and Site (0): (-240 + 0) / 2 = -120, aligned with Dataset y=590
+    
+    // Locations - aligned with Site
+    Location: { x: -240, y: 0 }, // Aligned with Site
+    
+    // Center column - Analysis branch
+    Analysis: { x: 200, y: 350 },
+    Dataset: { x: 200, y: 590 }, // 120px below the lowest Analysis (350 + 120 for first Analysis + 120 spacing = 590)
+    
+    // Right column - Values (vertically aligned)
+    TaxonCount: { x: 400, y: 200 },
+    AnalysisValue: { x: 400, y: 350 },
+    MeasuredValue: { x: 400, y: 500 },
+    
+    // Far right - Classifications and Taxonomy
+    ValueClass: { x: 600, y: 200 },
+    Taxon: { x: 600, y: 200 }, // Horizontally aligned with TaxonCount
+    
+    // Top right - Bibliography (horizontally aligned with Site, vertically aligned with TaxonCount)
+    Bibliography: { x: 400, y: 0 } // Same X as TaxonCount (400), same Y as Site (0)
+  };
   
-  // Handle multiple entities of same type - spread them out
+  // Group entities by type for spreading
   const entityGroups = {};
   cy.nodes('[nodeType = "entity"]').forEach(function(node) {
     const entity = node.data('entity');
@@ -804,80 +541,202 @@ function applyDatabaseSchemaPositioning() {
     entityGroups[entity].push(node);
   });
   
-  // Spread out multiple entities of same type vertically
-  Object.values(entityGroups).forEach(function(nodes) {
-    if (nodes.length > 1) {
-      nodes.forEach(function(node, index) {
-        const pos = node.position();
-        node.position({
-          x: pos.x,
-          y: pos.y + (index * 80) // Vertical spacing instead of horizontal
-        });
+  // Position all entity nodes
+  Object.entries(entityGroups).forEach(([entityType, nodes]) => {
+    const basePos = positions[entityType] || { x: 0, y: 500 };
+    console.log(`Positioning ${nodes.length} ${entityType} nodes at base position:`, basePos);
+    
+    // Special handling for AnalysisValue - sort based on connected Analysis order
+    if (entityType === 'AnalysisValue') {
+      // Get all Analysis nodes and their Y positions
+      const analysisNodes = cy.nodes('[entity = "Analysis"]');
+      const analysisPositions = {};
+      
+      analysisNodes.forEach(function(analysisNode) {
+        analysisPositions[analysisNode.id()] = analysisNode.position().y;
+      });
+      
+      // Sort AnalysisValue nodes based on their connected Analysis Y position
+      nodes.sort((a, b) => {
+        // Find connected Analysis for each AnalysisValue
+        const aConnectedAnalysis = a.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Analysis"]');
+        const bConnectedAnalysis = b.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Analysis"]');
+        
+        const aAnalysisY = aConnectedAnalysis.length > 0 ? 
+          analysisPositions[aConnectedAnalysis[0].id()] || 0 : 0;
+        const bAnalysisY = bConnectedAnalysis.length > 0 ? 
+          analysisPositions[bConnectedAnalysis[0].id()] || 0 : 0;
+        
+        return aAnalysisY - bAnalysisY; // Sort by Y position (top to bottom)
       });
     }
+    
+    // Special handling for ValueClass - align with connected AnalysisValue
+    if (entityType === 'ValueClass') {
+      // Get AnalysisValue positions after they've been positioned
+      const analysisValueNodes = cy.nodes('[entity = "AnalysisValue"]');
+      const analysisValuePositions = {};
+      
+      analysisValueNodes.forEach(function(avNode) {
+        analysisValuePositions[avNode.id()] = avNode.position().y;
+      });
+      
+      // Sort ValueClass nodes based on their connected AnalysisValue Y position
+      nodes.sort((a, b) => {
+        // Find connected AnalysisValue for each ValueClass
+        const aConnectedAV = a.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "AnalysisValue"]');
+        const bConnectedAV = b.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "AnalysisValue"]');
+        
+        const aAVY = aConnectedAV.length > 0 ? 
+          analysisValuePositions[aConnectedAV[0].id()] || basePos.y : basePos.y;
+        const bAVY = bConnectedAV.length > 0 ? 
+          analysisValuePositions[bConnectedAV[0].id()] || basePos.y : basePos.y;
+        
+        return aAVY - bAVY; // Sort by Y position (top to bottom)
+      });
+    }
+    
+    nodes.forEach((node, index) => {
+      let finalPos;
+      
+      if (entityType === 'Bibliography' && nodes.length > 1) {
+        // For multiple Bibliography nodes, position them above the first one
+        finalPos = {
+          x: basePos.x,
+          y: basePos.y - (index * 120) // Move up for additional nodes
+        };
+      } else if (entityType === 'ValueClass') {
+        // For ValueClass, align with connected AnalysisValue
+        const connectedAV = node.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "AnalysisValue"]');
+        
+        if (connectedAV.length > 0) {
+          const avPosition = connectedAV[0].position();
+          finalPos = {
+            x: basePos.x,
+            y: avPosition.y // Align Y with connected AnalysisValue
+          };
+        } else {
+          // Fallback to default positioning if no connection found
+          finalPos = {
+            x: basePos.x,
+            y: basePos.y + (index * 120)
+          };
+        }
+      } else {
+        // Default: spread vertically downward
+        finalPos = {
+          x: basePos.x,
+          y: basePos.y + (index * 120) // Vertical spacing for multiple nodes of same type
+        };
+      }
+      
+      console.log(`Setting ${entityType} node ${node.id()} to position:`, finalPos);
+      node.position(finalPos);
+    });
   });
   
-  // Position property nodes around their entities
+  // Position property nodes around their parent entities
   cy.nodes('[nodeType = "entity"]').forEach(function(entityNode) {
     const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
     const propNodes = propEdges.connectedNodes('[nodeType = "property"]');
     
     if (propNodes.length > 0) {
       const centerPos = entityNode.position();
-      const radius = 40;
-      const angleStep = (2 * Math.PI) / propNodes.length;
+      const entityType = entityNode.data('entity');
       
-      propNodes.forEach(function(propNode, index) {
-        const angle = angleStep * index;
-        const x = centerPos.x + radius * Math.cos(angle);
-        const y = centerPos.y + radius * Math.sin(angle);
-        propNode.position({ x: x, y: y });
-      });
+      // Define positioning strategy based on entity type
+      let offsetX = 0;
+      let offsetY = 0;
+      let arrangement = 'circle'; // default
+      
+      if (['Location', 'Project'].includes(entityType)) {
+        // Position to the left of the entity
+        arrangement = 'left';
+        offsetX = -120;
+        offsetY = 0;
+      } else if (['Method'].includes(entityType)) {
+        // Position to the north-east (above and right) of the entity
+        arrangement = 'northeast';
+        offsetX = 60;
+        offsetY = -60;
+      } else if (['Sample', 'Site', 'Bibliography'].includes(entityType)) {
+        // Position above the entity
+        arrangement = 'above';
+        offsetX = 0;
+        offsetY = -80;
+      } else if (['Dataset', 'AnalysisValue'].includes(entityType)) {
+        // Position below the entity
+        arrangement = 'below';
+        offsetX = 0;
+        offsetY = 80;
+      } else if (['Taxon', 'ValueClass'].includes(entityType)) {
+        // Position to the right of the entity
+        arrangement = 'right';
+        offsetX = 120;
+        offsetY = 0;
+      }
+      
+      if (arrangement === 'circle') {
+        // Default circular arrangement for other entities
+        const radius = 70;
+        const angleStep = (2 * Math.PI) / propNodes.length;
+        
+        propNodes.forEach(function(propNode, index) {
+          const angle = angleStep * index;
+          const x = centerPos.x + radius * Math.cos(angle);
+          const y = centerPos.y + radius * Math.sin(angle);
+          propNode.position({ x: x, y: y });
+        });
+      } else {
+        // Linear arrangement (left, right, above, below, northeast)
+        const spacing = 35; // spacing between property nodes
+        const startOffset = -(propNodes.length - 1) * spacing / 2;
+        
+        propNodes.forEach(function(propNode, index) {
+          let x, y;
+          
+          if (arrangement === 'left' || arrangement === 'right') {
+            // Vertical line to the left or right
+            x = centerPos.x + offsetX;
+            y = centerPos.y + startOffset + (index * spacing);
+          } else if (arrangement === 'above' || arrangement === 'below') {
+            // Horizontal line above or below
+            x = centerPos.x + startOffset + (index * spacing);
+            y = centerPos.y + offsetY;
+          } else if (arrangement === 'northeast') {
+            // Diagonal line towards north-east
+            const diagonalSpacing = spacing * 0.7; // Reduce spacing for diagonal arrangement
+            x = centerPos.x + offsetX + (index * diagonalSpacing * 0.7);
+            y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7);
+          }
+          
+          propNode.position({ x: x, y: y });
+        });
+      }
     }
   });
   
-  // Final fit
-  console.log('Starting final fit section...');
-  try {
-    console.log('About to call cy.fit...');
+  console.log('=== POSITIONING COMPLETE ===');
+  
+  // Debug: Check all entity nodes are properly positioned
+  cy.nodes('[nodeType = "entity"]').forEach(function(node) {
+    const pos = node.position();
+    const entity = node.data('entity');
+    console.log(`Final position for ${entity} ${node.id()}:`, pos, `visible: ${node.visible()}`);
+  });
+  
+  // Fit the view to show all elements
+  setTimeout(() => {
     if (cy && cy.elements().length > 0) {
-      cy.fit(cy.elements(), 80);
-      console.log('cy.fit completed successfully');
-    } else {
-      console.log('Skipping cy.fit - no elements or no cy instance');
+      cy.fit(cy.elements(), 60);
+      console.log('View fitted to all elements');
     }
-    console.log('Database schema positioning complete');
-    
-    // Debug: Check if site node is visible after positioning
-    const siteNode = cy.$('#site_6486');
-    if (siteNode.length > 0) {
-      const pos = siteNode.position();
-      const visible = siteNode.visible();
-      const style = siteNode.style();
-      console.log('Site node after positioning:', {
-        id: siteNode.id(),
-        position: pos,
-        visible: visible,
-        display: style.display,
-        opacity: style.opacity
-      });
-    } else {
-      console.log('Site node not found in cytoscape!');
-    }
-    
-    // Force all nodes to be visible and fit view
-    setTimeout(() => {
-      console.log('Final check: ensuring all nodes are visible...');
-      if (cy) {
-        cy.nodes().show();
-        cy.edges().show();
-        cy.fit(cy.elements(), 50);
-        console.log('All nodes should now be visible');
-      }
-    }, 200);
-  } catch (error) {
-    console.error('Error in final positioning steps:', error);
-  }
+  }, 100);
 }
 
 function render(graph){
@@ -898,18 +757,16 @@ function render(graph){
   cy = cytoscape({
     container: document.getElementById('cy'),
     elements: { nodes, edges },
-    layout: getLayoutOptions(document.getElementById('layoutSelect')?.value || 'database-schema'),
-    wheelSensitivity: 2.0,
+    layout: getDatabaseSchemaLayout(),
     style: [
       // Entity nodes (main nodes with boxes)
       { selector:'node[nodeType = "entity"]', style:{
-        'shape':'round-rectangle',
+        'shape':'ellipse',
         'background-color': n => (palette[n.data('entity')] || getCSSVar('--chip')),
         'border-width': 2, 'border-color': getCSSVar('--border'),
-        'label':'data(label)', 'font-size':'11px', 'text-wrap':'wrap','text-max-width':'140px',
-        'width': 'label', 'height': 'label', 'padding':'12px',
+        'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'100px',
+        'width': '80px', 'height': '40px', 'padding':'8px',
         'color':'#000000', 'text-valign':'center', 'text-halign':'center',
-        'min-width':'80px', 'min-height':'40px',
         'font-weight': 'bold' // Make the entire label bold for better visibility
       }},
       // Property nodes (text only, no box)
@@ -934,7 +791,7 @@ function render(graph){
       }},
       // Property edges (dashed)
       { selector:'edge[edgeType = "property"]', style:{
-        'curve-style':'straight', 'target-arrow-shape':'none',
+        'curve-style':'bezier', 'target-arrow-shape':'none',
         'width':1, 'line-style':'dashed',
         'line-color': getCSSVar('--muted'), 
         'label':'data(rel)', 'font-size':'8px',
@@ -968,28 +825,15 @@ function render(graph){
   });
   console.log('Nodes with invalid positions:', invalidPositions);
 
-  // Handle database-schema layout post-positioning
-  const selectedLayout = document.getElementById('layoutSelect')?.value || 'database-schema';
-  if (selectedLayout === 'database-schema') {
-    // Use setTimeout to ensure this runs after the layout is applied
-    setTimeout(() => {
-      applyDatabaseSchemaPositioning();
-    }, 100);
-    
-    // Also listen for layoutstop as backup
-    cy.one('layoutstop', function() {
-      applyDatabaseSchemaPositioning();
-    });
-  } else {
-    // For other layouts, ensure all nodes are visible
-    setTimeout(() => {
-      ensureNodesVisible();
-    }, 100);
-    
-    cy.one('layoutstop', function() {
-      ensureNodesVisible();
-    });
-  }
+  // Apply database schema positioning after layout
+  setTimeout(() => {
+    applyDatabaseSchemaPositioning();
+  }, 100);
+  
+  // Also listen for layoutstop as backup
+  cy.one('layoutstop', function() {
+    applyDatabaseSchemaPositioning();
+  });
 
   // selection panel
   const sel = document.getElementById('sel');
@@ -1020,26 +864,6 @@ document.getElementById('btnLoad').onclick = () => {
 document.getElementById('file').onchange = async (ev) => {
   const f = ev.target.files[0]; if(!f) return;
   const txt = await f.text(); ta.value = txt; document.getElementById('btnLoad').click();
-};
-
-document.getElementById('btnLayout').onclick = () => {
-  if (!cy) return;
-  const selectedLayout = document.getElementById('layoutSelect').value;
-  const layout = cy.layout(getLayoutOptions(selectedLayout));
-  
-  // Special handling for database-schema layout
-  if (selectedLayout === 'database-schema') {
-    layout.one('layoutstop', function() {
-      applyDatabaseSchemaPositioning();
-    });
-  } else {
-    // For other layouts, ensure all nodes are visible
-    layout.one('layoutstop', function() {
-      ensureNodesVisible();
-    });
-  }
-  
-  layout.run();
 };
 
 document.getElementById('btnPng').onclick = () => {
@@ -1095,6 +919,11 @@ q.addEventListener('input', () => {
   catch { sel = cy.nodes().filter(n => (n.data('label')||'').toLowerCase().includes(term.toLowerCase())); }
   sel.addClass('highlight');
   cy.edges().filter(e=> sel.contains(e.source()) || sel.contains(e.target())).addClass('highlight');
+});
+
+// Hide edge labels toggle
+document.getElementById('chkHideEdgeLabels').addEventListener('change', (ev) => {
+  toggleEdgeLabels(ev.target.checked);
 });
 
 // --- Demo loader from external file ---
