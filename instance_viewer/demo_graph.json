@@ -1,0 +1,362 @@
+{
+    "edges": [
+        {
+            "rel": "belongs_to",
+            "source": "sg_13952",
+            "target": "site_6486"
+        },
+        {
+            "rel": "in_group",
+            "source": "ps_63815",
+            "target": "sg_13952"
+        },
+        {
+            "rel": "from_sample",
+            "source": "ae_223424",
+            "target": "ps_63815"
+        },
+        {
+            "rel": "from_sample",
+            "source": "ae_223419",
+            "target": "ps_63815"
+        },
+        {
+            "rel": "in_dataset",
+            "source": "ae_223424",
+            "target": "ds_91919"
+        },
+        {
+            "rel": "in_dataset",
+            "source": "ae_223419",
+            "target": "ds_91914"
+        },
+        {
+            "rel": "belongs_to",
+            "source": "ds_91914",
+            "target": "p_507"
+        },
+        {
+            "rel": "belongs_to",
+            "source": "ds_91919",
+            "target": "p_507"
+        },
+        {
+            "rel": "produced_by",
+            "source": "ds_91919",
+            "target": "m_175"
+        },
+        {
+            "rel": "produced_by",
+            "source": "ds_91914",
+            "target": "m_175"
+        },
+        {
+            "rel": "uses_method",
+            "source": "sg_13952",
+            "target": "m_175"
+        },
+        {
+            "rel": "has_publication",
+            "source": "site_6486",
+            "target": "b_10738"
+        },
+        {
+            "rel": "has_location",
+            "source": "site_6486",
+            "target": "sl_4588"
+        },
+        {
+            "rel": "has_location",
+            "source": "site_6486",
+            "target": "sl_3969"
+        },
+        {
+            "rel": "has_location",
+            "source": "site_6486",
+            "target": "sl_4610"
+        },
+        {
+            "rel": "has_location",
+            "source": "site_6486",
+            "target": "sl_205"
+        },
+        {
+            "rel": "has_location",
+            "source": "site_6486",
+            "target": "sl_6266"
+        },
+        {
+            "rel": "has_publication",
+            "source": "ds_91919",
+            "target": "b_10738"
+        },
+        {
+            "rel": "has_publication",
+            "source": "ds_91914",
+            "target": "b_10738"
+        },
+        {
+            "rel": "described_in",
+            "source": "m_175",
+            "target": null
+        },
+        {
+            "rel": "measured_in",
+            "source": "av_71966",
+            "target": "ae_223419"
+        },
+        {
+            "rel": "measured_in",
+            "source": "av_72104",
+            "target": "ae_223424"
+        },
+        {
+            "rel": "measured_in",
+            "source": "av_71963",
+            "target": "ae_223419"
+        },
+        {
+            "rel": "measured_in",
+            "source": "av_72103",
+            "target": "ae_223424"
+        },
+        {
+            "rel": "measured_in",
+            "source": "av_71962",
+            "target": "ae_223419"
+        },
+        {
+            "rel": "of_type",
+            "source": "av_71966",
+            "target": "vc_43"
+        },
+        {
+            "rel": "of_type",
+            "source": "av_72104",
+            "target": "vc_43"
+        },
+        {
+            "rel": "of_type",
+            "source": "av_71963",
+            "target": "vc_42"
+        },
+        {
+            "rel": "of_type",
+            "source": "av_72103",
+            "target": "vc_42"
+        },
+        {
+            "rel": "of_type",
+            "source": "av_71962",
+            "target": "vc_41"
+        },
+        {
+            "rel": "measured_in",
+            "source": "tc_233927",
+            "target": "ae_223424"
+        },
+        {
+            "rel": "of_taxon",
+            "source": "tc_233927",
+            "target": "taxon_47009"
+        }
+    ],
+    "nodes": [
+        {
+            "id": "site_6486",
+            "attrs": {
+                "name": "Skänninge Abbey",
+                "accuracy": "Cultural Heritage site",
+                "coordinate": [
+                    58.398269,
+                    15.082804
+                ],
+                "national_id": "L2011:9764"
+            },
+            "entity": "Site"
+        },
+        {
+            "id": "sg_13952",
+            "attrs": {
+                "name": "A017-005-Kufe"
+            },
+            "entity": "SampleGroup"
+        },
+        {
+            "id": "ps_63815",
+            "attrs": {
+                "name": "A017-005",
+                "type": "Unspecified"
+            },
+            "entity": "Sample"
+        },
+        {
+            "id": "ae_223424",
+            "attrs": {},
+            "entity": "Analysis"
+        },
+        {
+            "id": "ae_223419",
+            "attrs": {},
+            "entity": "Analysis"
+        },
+        {
+            "id": "ds_91919",
+            "attrs": {
+                "name": "sample_A017-005",
+                "data_type": "Mixed-method dependent",
+                "master_name": "SciLifelab Ancient DNA"
+            },
+            "entity": "Dataset"
+        },
+        {
+            "id": "ds_91914",
+            "attrs": {
+                "name": "library_A017-005-S1L1",
+                "data_type": "Mixed-method dependent",
+                "master_name": "SciLifelab Ancient DNA"
+            },
+            "entity": "Dataset"
+        },
+        {
+            "id": "sl_4588",
+            "attrs": {
+                "name": "Östergötlands län",
+                "type": "Sub-country administrative region"
+            },
+            "entity": "Location"
+        },
+        {
+            "id": "sl_3969",
+            "attrs": {
+                "name": "Östergötland",
+                "type": "Sub-country administrative region"
+            },
+            "entity": "Location"
+        },
+        {
+            "id": "sl_4610",
+            "attrs": {
+                "name": "Mjölby kommun",
+                "type": "Sub-country administrative region"
+            },
+            "entity": "Location"
+        },
+        {
+            "id": "sl_205",
+            "attrs": {
+                "name": "Sweden",
+                "type": "Country"
+            },
+            "entity": "Location"
+        },
+        {
+            "id": "sl_6266",
+            "attrs": {
+                "name": "Skänninge parish",
+                "type": "Sub-country administrative region"
+            },
+            "entity": "Location"
+        },
+        {
+            "id": "p_507",
+            "attrs": {
+                "project_name": "SciLifeLab Ancient DNA Unit project 017"
+            },
+            "entity": "Project"
+        },
+        {
+            "id": "m_175",
+            "attrs": {
+                "biblio_id": null,
+                "method_id": 175,
+                "method_name": "Ancient DNA analysis",
+                "record_type": "DNA"
+            },
+            "entity": "Method"
+        },
+        {
+            "id": "b_10738",
+            "attrs": {
+                "citation": "Caroline, A.A., Hedvall, R., Lundgren, M. (2020)."
+            },
+            "entity": "Bibliography"
+        },
+        {
+            "id": "av_71966",
+            "attrs": {
+                "analysis_value": "null"
+            },
+            "entity": "AnalysisValue"
+        },
+        {
+            "id": "av_72104",
+            "attrs": {
+                "analysis_value": "null"
+            },
+            "entity": "AnalysisValue"
+        },
+        {
+            "id": "av_71963",
+            "attrs": {
+                "analysis_value": "V18a"
+            },
+            "entity": "AnalysisValue"
+        },
+        {
+            "id": "av_72103",
+            "attrs": {
+                "analysis_value": "V18a"
+            },
+            "entity": "AnalysisValue"
+        },
+        {
+            "id": "av_71962",
+            "attrs": {
+                "analysis_value": "null"
+            },
+            "entity": "AnalysisValue"
+        },
+        {
+            "id": "vc_43",
+            "attrs": {
+                "name": "Molecular sex - Rx",
+                "value_type": "Molecular sex"
+            },
+            "entity": "ValueClass"
+        },
+        {
+            "id": "vc_42",
+            "attrs": {
+                "name": "mtDNA haplogroup",
+                "value_type": "Identifier"
+            },
+            "entity": "ValueClass"
+        },
+        {
+            "id": "vc_41",
+            "attrs": {
+                "name": "Y haplogroup",
+                "value_type": "Identifier"
+            },
+            "entity": "ValueClass"
+        },
+        {
+            "id": "tc_233927",
+            "attrs": {
+                "count": 1
+            },
+            "entity": "TaxonCount"
+        },
+        {
+            "id": "taxon_47009",
+            "attrs": {
+                "genus": "Homo",
+                "author": null,
+                "family": "Hominidae",
+                "species": "H. sapiens"
+            },
+            "entity": "Taxon"
+        }
+    ]
+}

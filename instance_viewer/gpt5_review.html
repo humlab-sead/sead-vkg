@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SEAD Instance Graph – Cytoscape.js Viewer (Cleaned)</title>
+<style>
+  /* Light mode (default) */
+  :root{
+    --bg: #ffffff; 
+    --panel: #f8fafc; 
+    --ink: #1e293b; 
+    --ink-dim: #64748b; 
+    --accent: #3b82f6; 
+    --muted: #6b7280;
+    --chip: #e2e8f0; 
+    --border: #e2e8f0; 
+    --ok: #10b981; 
+    --warn: #f59e0b;
+    --textarea-bg: #f1f5f9;
+    --pill-bg: #e2e8f0;
+    --node-text: #1e293b;
+    --edge-color: #64748b;
+    --header-gradient: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,0));
+  }
+
+  /* Dark mode */
+  @media (prefers-color-scheme: dark) {
+    :root{
+      --bg: #0b1020; 
+      --panel: #0f1733; 
+      --ink: #e6ecff; 
+      --ink-dim: #b9c3e6; 
+      --accent: #7aa2ff; 
+      --muted: #7b86a6;
+      --chip: #172043; 
+      --border: #243056; 
+      --ok: #89f0c2; 
+      --warn: #ffd581;
+      --textarea-bg: #0b132b;
+      --pill-bg: #15234a;
+      --node-text: #06111f;
+      --edge-color: #a8b3d9;
+      --header-gradient: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0));
+    }
+  }
+
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial}
+  /* Layout: header + controls + two side panels + graph (flex) + bottom side + footer */
+  .wrap{display:grid;grid-template-rows:auto auto auto 1fr auto auto;gap:12px;min-height:100vh}
+  header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--header-gradient);}
+  header h1{font-size:16px;margin:0 8px 0 0;color:var(--ink)}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 12px 4px}
+  .controls > *{background:var(--panel);border:1px solid var(--border);color:var(--ink);border-radius:12px;padding:6px 10px}
+  .controls button{cursor:pointer;transition:background-color 0.2s ease;}
+  .controls button:hover{background:var(--chip);}  
+  .controls input[type="file"]{padding:4px 8px}
+  .controls input[type="text"]{height:36px;min-width:260px}
+  #cy{min-height:460px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  /* Make the graph row stretch */
+  #cy{height:100%;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px}
+  .panel h3{margin:0 0 8px 0;font-size:13px;color:var(--ink-dim);letter-spacing:.2px}
+  .side{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:0 12px 0}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);color:var(--ink);padding:4px 8px;border-radius:999px;border:1px solid var(--border);font-size:12px;display:inline-flex;gap:6px;align-items:center;transition:background-color 0.2s ease;}
+  .chip:hover{background:var(--border);}  
+  .chip input{margin-right:2px}
+  .legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+  .legend .item{display:flex;gap:8px;align-items:center}
+  .swatch{width:14px;height:14px;border-radius:4px;border:1px solid var(--border)}
+  textarea#json{width:100%;height:140px;background:var(--textarea-bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:8px}
+  .hint{color:var(--muted);font-size:12px}
+  .hint code{background:var(--chip);padding:2px 4px;border-radius:4px;font-size:11px;}
+  .attr{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px;white-space:pre-wrap;color:var(--ink);}  
+  .footer{padding:8px 12px;color:var(--muted);font-size:12px}
+  .pill{padding:2px 6px;border-radius:999px;background:var(--pill-bg);border:1px solid var(--border);color:var(--ink-dim);font-size:12px}
+  hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
+</style>
+<!-- libs -->
+<script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2/cytoscape-dagre.js"></script>
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6/dist/tippy-bundle.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/scale.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>SEAD Instance Graph</h1>
+      <span class="pill" id="status" role="status" aria-live="polite">idle</span>
+    </header>
+
+    <div class="controls" aria-label="Graph controls">
+      <input type="file" id="file" accept=".json,.txt" title="Load JSON file" />
+      <button id="btnLoad" title="Load JSON from textbox">Load from textbox</button>
+      <button id="btnDemo" title="Load demo data">Load demo</button>
+      <select id="layoutSelect" title="Choose layout algorithm" aria-label="Choose layout">
+        <option value="dagre">Dagre (Hierarchical)</option>
+        <option value="grid">Grid</option>
+        <option value="circle">Circle</option>
+        <option value="concentric">Concentric</option>
+        <option value="breadthfirst">Breadth First</option>
+        <option value="cose">CoSE (Force-directed)</option>
+        <option value="random">Random</option>
+        <option value="preset">Preset (Current positions)</option>
+      </select>
+      <button id="btnLayout" title="Apply selected layout">Apply Layout</button>
+      <button id="btnPng" title="Export PNG of the graph">Export PNG</button>
+      <input id="q" type="text" placeholder="Search node text… (regex ok)" aria-label="Search nodes" />
+      <button id="btnExportPos" title="Export current node positions">Export positions</button>
+      <button id="btnToggleFull" title="Toggle full-canvas export">Toggle full export</button>
+      <button id="btnToggleBg" title="Toggle transparent background for export">Toggle transparent BG</button>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <h3>Paste JSON here (raw object or Postgres-wrapped string)</h3>
+        <textarea id="json" placeholder='{"nodes":[...],"edges":[...]}'>
+        </textarea>
+        <div class="hint">Tips: If your SQL client wraps the JSON in a column (e.g. <code>jsonb_build_object</code> with a long quoted string), paste that blob here—this viewer will extract and parse it. Optional: include a <code>{ positions: { nodeId: {x,y}, ... } }</code> object alongside to use the <em>Preset</em> layout.
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Legend & Filters</h3>
+        <div id="legend" class="legend"></div>
+        <hr style="border-color:#0002"/>
+        <div class="chips" id="filters"></div>
+      </div>
+    </div>
+
+    <div id="cy" role="application" aria-label="Instance graph canvas"></div>
+
+    <div class="side">
+      <div class="panel">
+        <h3>Selection</h3>
+        <div id="sel">Click a node or edge…</div>
+      </div>
+      <div class="panel">
+        <h3>How it works</h3>
+        <div class="hint">
+          Nodes expect: <code>{ id, entity, attrs }</code>. Label is derived from <code>entity</code> + key attrs (e.g., <code>sample_name</code>, <code>site_name</code>).<br/>
+          Edges expect: <code>{ source, target, rel }</code>. Edges missing <code>source</code>/<code>target</code> are dropped.
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">Layout: Dagre (directed). Drag to rearrange; use Search (⌘/Ctrl+F focuses) to highlight matches. PNG export can render viewport or the full graph; transparent background optional.</div>
+  </div>
+
+<script>
+// Register Cytoscape extensions when available
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
+    try { cytoscape.use(dagre); } catch(e) { /* already registered */ }
+  }
+});
+
+// ---- Palette per entity ----
+const palette = {
+  Site:        '#FDE68A',  // Light amber
+  SampleGroup: '#BFDBFE',  // Light blue
+  Sample:      '#BBF7D0',  // Light green
+  Analysis:    '#FCA5A5',  // Light red/pink
+  Dataset:     '#DDD6FE',  // Light purple
+  Location:    '#FBCFE8',  // Light pink
+  Feature:     '#FDBA74',  // Light orange
+  Project:     '#A7F3D0',  // Light teal
+  Method:      '#93C5FD',  // Medium blue
+  Bibliography:'#E9D5FF',  // Very light purple
+  AnalysisValue:'#F9A8D4', // Light magenta
+  ValueClass:  '#E5E7EB',  // Light gray
+  TaxonCount:  '#C7D2FE',  // Light indigo
+  MeasuredValue:'#FEF3C7', // Very light amber
+  Taxon:       '#D1FAE5'   // Very light green
+};
+
+let cy;
+let exportFull = false;
+let exportTransparent = false;
+const status = (s) => document.getElementById('status').textContent = s;
+
+// CSS var helper
+function getCSSVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function updateCytoscapeStyles() {
+  if (!cy) return;
+  cy.style()
+    .selector('node')
+    .style({ 'border-color': getCSSVar('--border'), 'color': getCSSVar('--node-text') })
+    .selector('edge')
+    .style({ 'line-color': getCSSVar('--edge-color'), 'target-arrow-color': getCSSVar('--edge-color'), 'text-background-color': getCSSVar('--panel'), 'color': getCSSVar('--ink-dim') })
+    .selector('.highlight')
+    .style({ 'border-color': getCSSVar('--accent') })
+    .selector('edge.highlight')
+    .style({ 'line-color': getCSSVar('--accent'), 'target-arrow-color': getCSSVar('--accent') })
+    .update();
+}
+
+// Theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateCytoscapeStyles);
+
+function parseMaybeWrapped(input){
+  try{
+    if (typeof input === 'string') input = input.trim();
+    if (typeof input === 'string' && input.startsWith('{')) return JSON.parse(input);
+    const match = input.match(/\{[\s\S]*\}$/); // last {...}
+    if (match) return JSON.parse(match[0]);
+  }catch(e){ console.error('Parse error', e); }
+  throw new Error('Could not parse JSON. Paste either the raw object {nodes,edges} or the quoted JSON string.');
+}
+
+function getMainLabel(node) {
+  const e = node.entity;
+  const a = node.attrs || {};
+  const id = node.id || '';
+  return (
+    e === 'Sample' ? (a.sample_name || a.name || id) :
+    e === 'Site' ? (a.site_name || a.name || id) :
+    e === 'SampleGroup' ? (a.sample_group_name || a.name || id) :
+    e === 'Dataset' ? (a.dataset_name || a.name || id) :
+    e === 'Analysis' ? (a.analysis_entity_id ? ('AE ' + a.analysis_entity_id) : id) :
+    e === 'Location' ? (a.location_name || a.name || id) :
+    e === 'Project' ? (a.project_name || a.name || id) :
+    e === 'Method' ? (a.method_name || a.name || id) :
+    e === 'Bibliography' ? (a.citation || id) :
+    e === 'ValueClass' ? (a.name || id) :
+    e === 'AnalysisValue' ? (a.analysis_value ?? ('AV ' + (a.analysis_value_id||''))) :
+    e === 'MeasuredValue' ? (String(a.measured_value)) :
+    e === 'TaxonCount' ? ('Count ' + (a.count ?? '')) :
+    e === 'Taxon' ? ([a.genus_name||a.genus, a.species].filter(Boolean).join(' ') || id) :
+    id
+  );
+}
+
+function makeElements(graph){
+  const nodes = [];
+  const edges = [];
+  const MAX_PROP_LEN = 80;
+
+  (graph.nodes||[]).forEach(n => {
+    // entity node
+    nodes.push({ data: { id: n.id, entity: n.entity, label: `[${n.entity}]\n${getMainLabel(n)}`, attrs: n.attrs || {}, nodeType: 'entity' } });
+
+    // property nodes
+    const attrs = n.attrs || {};
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (key === 'coordinate') return; // skip noisy arrays
+      const v = Array.isArray(value) ? value.join(', ') : (value ?? '');
+      const sv = String(v).trim();
+      if (!sv || sv.toLowerCase() === 'null' || sv === 'NaN') return; // drop empty-ish
+      const displayValue = sv.length > MAX_PROP_LEN ? sv.slice(0, MAX_PROP_LEN-1) + '…' : sv;
+      const propId = `${n.id}_prop_${key}`;
+      nodes.push({ data: { id: propId, entity: 'Property', label: displayValue, nodeType: 'property', propertyKey: key, fullValue: sv } });
+      edges.push({ data: { id: `${n.id}_to_${propId}`, source: n.id, target: propId, rel: key, edgeType: 'property' }});
+    });
+  });
+
+  (graph.edges||[]).filter(e => e && e.source && e.target).forEach((e, i) => {
+    edges.push({ data: { id: 'e'+i, source: e.source, target: e.target, rel: e.rel||'', edgeType: 'relationship' } });
+  });
+
+  return {nodes, edges};
+}
+
+function buildLegendAndFilters(graph){
+  const entSet = new Set((graph.nodes||[]).map(n=>n.entity));
+  entSet.delete('Property');
+  const legend = document.getElementById('legend');
+  const filters = document.getElementById('filters');
+  legend.innerHTML = '';
+  filters.innerHTML = '';
+
+  [...entSet].sort().forEach(ent=>{
+    const color = palette[ent] || '#eee';
+    const item = document.createElement('div');
+    item.className='item';
+    item.innerHTML = `<span class="swatch" style="background:${color}"></span> <span>${ent}</span>`;
+    legend.appendChild(item);
+
+    const chip = document.createElement('label');
+    chip.className = 'chip';
+    const id = 'f_'+ent;
+    chip.innerHTML = `<input type="checkbox" id="${id}" checked> ${ent}`;
+    chip.querySelector('input').addEventListener('change', (ev)=>{
+      const show = ev.target.checked;
+      const sel = `node[entity = "${ent}"]`;
+      const nodes = cy.$(sel);
+      show ? nodes.show() : nodes.hide();
+      // Also hide/show connected property nodes
+      if (show) {
+        nodes.connectedEdges('[edgeType = "property"]').connectedNodes('[nodeType = "property"]').show();
+        nodes.connectedEdges('[edgeType = "property"]').show();
+      } else {
+        nodes.connectedEdges('[edgeType = "property"]').connectedNodes('[nodeType = "property"]').hide();
+        nodes.connectedEdges('[edgeType = "property"]').hide();
+      }
+    });
+    filters.appendChild(chip);
+  });
+
+  // Properties toggle
+  const propChip = document.createElement('label');
+  propChip.className = 'chip';
+  propChip.innerHTML = `<input type="checkbox" id="f_properties" checked> Properties`;
+  propChip.querySelector('input').addEventListener('change', (ev)=>{
+    const show = ev.target.checked;
+    const propNodes = cy.$('node[nodeType = "property"]');
+    const propEdges = cy.$('edge[edgeType = "property"]');
+    show ? (propNodes.show(), propEdges.show()) : (propNodes.hide(), propEdges.hide());
+  });
+  filters.appendChild(propChip);
+}
+
+function attachTooltips(){
+  cy.nodes().forEach(n=>{
+    const content = document.createElement('div');
+    content.className='attr';
+    let obj;
+    if (n.data('nodeType') === 'property') {
+      obj = { id: n.id(), type: 'Property', key: n.data('propertyKey'), value: n.data('fullValue') || n.data('label') };
+    } else {
+      obj = { id: n.id(), entity: n.data('entity'), attrs: n.data('attrs') };
+    }
+    content.textContent = JSON.stringify(obj, null, 2);
+
+    if (n.tippy) n.tippy.destroy();
+    const dummy = document.createElement('div');
+    n.tippy = tippy(dummy, {
+      getReferenceClientRect: () => {
+        const bb = n.renderedBoundingBox();
+        return { width: bb.w, height: bb.h, top: bb.y1, bottom: bb.y2, left: bb.x1, right: bb.x2 };
+      },
+      appendTo: document.body,
+      interactive: true,
+      trigger: 'manual',
+      theme: 'light-border',
+      animation: 'scale',
+      content
+    });
+    n.on('mouseover focus', ()=> n.tippy.show());
+    n.on('mouseout blur',  ()=> n.tippy.hide());
+  });
+}
+
+function getLayoutOptions(layoutName) {
+  const base = { animate: true, animationDuration: 500, fit: true, padding: 20 };
+  switch (layoutName) {
+    case 'dagre':
+      return { ...base, name: 'dagre', rankDir: 'LR', align: 'UL', nodeSep: 20, rankSep: 60, edgeSep: 10, ranker: 'tight-tree' };
+    case 'grid':
+      return { ...base, name: 'grid', animate: false };
+    case 'circle':
+      return { ...base, name: 'circle', spacingFactor: 1.5, startAngle: -Math.PI/2 };
+    case 'concentric':
+      return { ...base, name: 'concentric', concentric: n => n.data('nodeType') === 'entity' ? 2 : 1, levelWidth: nodes => nodes.maxDegree()/4, spacingFactor: 2, minNodeSpacing: 50 };
+    case 'breadthfirst':
+      return { ...base, name: 'breadthfirst', directed: true, spacingFactor: 1.5, maximal: false, grid: false };
+    case 'cose':
+      return { ...base, name: 'cose', nodeRepulsion: n => n.data('nodeType') === 'property' ? 2000 : 8000, nodeOverlap: 10, idealEdgeLength: e => e.data('edgeType') === 'property' ? 30 : 120, edgeElasticity: e => e.data('edgeType') === 'property' ? 800 : 200, nestingFactor: 1, gravity: 80, numIter: 1500, initialTemp: 200, coolingFactor: 0.95, minTemp: 1.0 };
+    case 'random':
+      return { ...base, name: 'random' };
+    case 'preset':
+      return { ...base, name: 'preset', animate: false };
+    default:
+      return { ...base, name: 'grid' };
+  }
+}
+
+function render(graph){
+  status('rendering…');
+
+  // try applying preset positions if provided alongside nodes
+  const maybePositions = (()=>{ try{ const p = JSON.parse(document.getElementById('json').value || '{}').positions; return (p && typeof p === 'object') ? p : null; }catch{return null;} })();
+
+  const rawEdges = (graph.edges||[]);
+  const validEdges = rawEdges.filter(e => e && e.source && e.target);
+  const dropped = rawEdges.length - validEdges.length;
+
+  const {nodes, edges} = makeElements({ nodes: graph.nodes, edges: validEdges });
+
+  if (cy) { cy.destroy(); }
+
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: { nodes, edges },
+    layout: getLayoutOptions(document.getElementById('layoutSelect')?.value || 'dagre'),
+    wheelSensitivity: 0.2,
+    style: [
+      { selector:'node[nodeType = "entity"]', style:{
+        'shape':'round-rectangle',
+        'background-color': n => (palette[n.data('entity')] || getCSSVar('--chip')),
+        'border-width': 2, 'border-color': getCSSVar('--border'),
+        'label':'data(label)', 'font-size':'11px', 'text-wrap':'wrap','text-max-width':'140px',
+        'width': 'label', 'height': 'label', 'padding':'12px',
+        'color':'#000000', 'text-valign':'center', 'text-halign':'center',
+        'min-width':'80px', 'min-height':'40px'
+      }},
+      { selector:'node[nodeType = "property"]', style:{
+        'shape':'rectangle', 'background-color': 'transparent', 'border-width': 0,
+        'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'120px',
+        'width': '20px', 'height': '20px', 'color': getCSSVar('--ink-dim'), 'text-valign':'center', 'text-halign':'center'
+      }},
+      { selector:'edge[edgeType = "relationship"]', style:{
+        'curve-style':'bezier', 'target-arrow-shape':'triangle', 'arrow-scale':0.8,
+        'width':2, 'line-color': getCSSVar('--edge-color'), 'target-arrow-color': getCSSVar('--edge-color'),
+        'label':'data(rel)', 'font-size':'9px', 'text-background-color': getCSSVar('--panel'), 'text-background-opacity':0.9, 'text-background-padding':'3px', 'color': getCSSVar('--ink-dim')
+      }},
+      { selector:'edge[edgeType = "property"]', style:{
+        'curve-style':'straight', 'target-arrow-shape':'none', 'width':1, 'line-style':'dashed',
+        'line-color': getCSSVar('--muted'), 'label':'data(rel)', 'font-size':'8px', 'text-background-color': getCSSVar('--panel'), 'text-background-opacity':0.7, 'text-background-padding':'2px', 'color': getCSSVar('--ink-dim'), 'opacity': 0.6,
+        'edge-distances': 'node-position', 'source-distance-from-node': 5, 'target-distance-from-node': 5
+      }},
+      { selector:'.highlight', style:{ 'border-width':3, 'border-color': getCSSVar('--accent') }},
+      { selector:'edge.highlight', style:{ 'width':3, 'line-color': getCSSVar('--accent'), 'target-arrow-color': getCSSVar('--accent') }},
+      { selector:'node.root', style:{ 'border-width':4, 'border-color': getCSSVar('--accent'), 'shadow-blur':10, 'shadow-color': getCSSVar('--accent'), 'shadow-opacity':0.35 } }
+    ]
+  });
+
+  // apply preset positions if present
+  if (maybePositions) {
+    cy.nodes('[nodeType = "entity"]').forEach(n => {
+      const p = maybePositions[n.id()];
+      if (p && typeof p.x === 'number' && typeof p.y === 'number') n.position(p);
+    });
+    cy.layout(getLayoutOptions('preset')).run();
+  }
+
+  updateCytoscapeStyles();
+
+  // selection panel
+  const sel = document.getElementById('sel');
+  const setSel = (html) => sel.innerHTML = html;
+  cy.on('select unselect', 'node,edge', () => {
+    const n = cy.$(':selected');
+    if (!n.length) { setSel('Click a node or edge…'); return; }
+    const el = n[0];
+    if (el.isNode()){
+      setSel(`<div><strong>Node:</strong> ${el.id()}</div><div class="attr">${JSON.stringify(el.data(), null, 2)}</div>`);
+    } else {
+      setSel(`<div><strong>Edge:</strong> ${el.id()}</div><div class="attr">${JSON.stringify(el.data(), null, 2)}</div>`);
+    }
+  });
+
+  // root emphasis (Samples as focal nodes)
+  cy.$('node[entity = "Sample"]').addClass('root');
+
+  attachTooltips();
+  buildLegendAndFilters(graph);
+
+  status(`${graph.nodes?.length||0} nodes • ${validEdges.length||0} edges${dropped ? ` • ${dropped} dropped` : ''}`);
+}
+
+// --- controls ---
+const ta = document.getElementById('json');
+const layoutSelect = document.getElementById('layoutSelect');
+
+// Debounced search
+const q = document.getElementById('q');
+let searchTimer;
+q.addEventListener('input', () => {
+  if (!cy) return;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    cy.$('.highlight').removeClass('highlight');
+    const term = q.value.trim(); if (!term) return;
+    let sel;
+    try { sel = cy.nodes().filter(n => new RegExp(term, 'i').test(n.data('label'))); }
+    catch { sel = cy.nodes().filter(n => (n.data('label')||'').toLowerCase().includes(term.toLowerCase())); }
+    sel.addClass('highlight');
+    cy.edges().filter(e=> sel.contains(e.source()) || sel.contains(e.target())).addClass('highlight');
+  }, 120);
+});
+
+// Focus search with Cmd/Ctrl+F
+document.addEventListener('keydown', (ev) => {
+  const k = ev.key.toLowerCase();
+  if ((ev.ctrlKey || ev.metaKey) && k === 'f') { ev.preventDefault(); q.focus(); }
+});
+
+// File input
+document.getElementById('file').onchange = async (ev) => {
+  const f = ev.target.files[0]; if(!f) return;
+  const txt = await f.text(); ta.value = txt; document.getElementById('btnLoad').click();
+};
+
+// Load from textarea
+document.getElementById('btnLoad').onclick = () => {
+  try{ const g = parseMaybeWrapped(ta.value); render(g); localStorage.setItem('sead_graph_json', ta.value); }
+  catch(e){ alert(e.message); }
+};
+
+// Apply layout
+document.getElementById('btnLayout').onclick = () => {
+  if (!cy) return;
+  const selectedLayout = layoutSelect.value;
+  cy.layout(getLayoutOptions(selectedLayout)).run();
+  localStorage.setItem('sead_layout', selectedLayout);
+};
+
+// Export PNG
+document.getElementById('btnPng').onclick = () => {
+  if (!cy) return;
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const bgColor = exportTransparent ? undefined : (isDark ? '#0b1020' : '#ffffff');
+  const png = cy.png({ full: exportFull, scale: 2, bg: bgColor });
+  const a = document.createElement('a'); a.href = png; a.download = 'sead_instance.png'; a.click();
+};
+
+// Export positions
+document.getElementById('btnExportPos').onclick = () => {
+  if (!cy) return;
+  const pos = {};
+  cy.nodes('[nodeType = "entity"]').forEach(n => { pos[n.id()] = n.position(); });
+  const blob = new Blob([JSON.stringify(pos, null, 2)], {type:'application/json'});
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'positions.json' });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+// Toggles for export options
+document.getElementById('btnToggleFull').onclick = () => { exportFull = !exportFull; document.getElementById('btnToggleFull').classList.toggle('active', exportFull); };
+document.getElementById('btnToggleBg').onclick   = () => { exportTransparent = !exportTransparent; document.getElementById('btnToggleBg').classList.toggle('active', exportTransparent); };
+
+// Persist / restore minimal state
+(function restoreState(){
+  const saved = localStorage.getItem('sead_graph_json');
+  if (saved) { ta.value = saved; }
+  const savedLayout = localStorage.getItem('sead_layout');
+  if (savedLayout) layoutSelect.value = savedLayout;
+})();
+
+// Resize handler to keep viewport fresh
+window.addEventListener('resize', () => { if (cy) cy.resize(); });
+
+// --- Demo loader (example blob) ---
+const demoBlob = `{
+  "edges": [
+    {"rel":"belongs_to","source":"sg_13952","target":"site_6486"},
+    {"rel":"in_group","source":"ps_63815","target":"sg_13952"},
+    {"rel":"from_sample","source":"ae_223424","target":"ps_63815"},
+    {"rel":"from_sample","source":"ae_223419","target":"ps_63815"},
+    {"rel":"in_dataset","source":"ae_223424","target":"ds_91919"},
+    {"rel":"in_dataset","source":"ae_223419","target":"ds_91914"},
+    {"rel":"belongs_to","source":"ds_91914","target":"p_507"},
+    {"rel":"belongs_to","source":"ds_91919","target":"p_507"},
+    {"rel":"produced_by","source":"ds_91919","target":"m_175"},
+    {"rel":"produced_by","source":"ds_91914","target":"m_175"},
+    {"rel":"uses_method","source":"sg_13952","target":"m_175"},
+    {"rel":"has_publication","source":"site_6486","target":"b_10738"},
+    {"rel":"has_location","source":"site_6486","target":"sl_4588"},
+    {"rel":"has_location","source":"site_6486","target":"sl_3969"},
+    {"rel":"has_location","source":"site_6486","target":"sl_4610"},
+    {"rel":"has_location","source":"site_6486","target":"sl_205"},
+    {"rel":"has_location","source":"site_6486","target":"sl_6266"},
+    {"rel":"has_publication","source":"ds_91919","target":"b_10738"},
+    {"rel":"has_publication","source":"ds_91914","target":"b_10738"},
+    {"rel":"described_in","source":"m_175","target": null},
+    {"rel":"measured_in","source":"av_71966","target":"ae_223419"},
+    {"rel":"measured_in","source":"av_72104","target":"ae_223424"},
+    {"rel":"measured_in","source":"av_71963","target":"ae_223419"},
+    {"rel":"measured_in","source":"av_72103","target":"ae_223424"},
+    {"rel":"measured_in","source":"av_71962","target":"ae_223419"},
+    {"rel":"of_type","source":"av_71966","target":"vc_43"},
+    {"rel":"of_type","source":"av_72104","target":"vc_43"},
+    {"rel":"of_type","source":"av_71963","target":"vc_42"},
+    {"rel":"of_type","source":"av_72103","target":"vc_42"},
+    {"rel":"of_type","source":"av_71962","target":"vc_41"},
+    {"rel":"measured_in","source":"tc_233927","target":"ae_223424"},
+    {"rel":"of_taxon","source":"tc_233927","target":"taxon_47009"}
+  ],
+  "nodes": [
+    {"id":"site_6486","attrs":{"name":"Skänninge Abbey","accuracy":"Cultural Heritage site","coordinate":[58.398269,15.082804],"national_id":"L2011:9764"},"entity":"Site"},
+    {"id":"sg_13952","attrs":{"name":"A017-005-Kufe"},"entity":"SampleGroup"},
+    {"id":"ps_63815","attrs":{"name":"A017-005","type":"Unspecified"},"entity":"Sample"},
+    {"id":"ae_223424","attrs":{},"entity":"Analysis"},
+    {"id":"ae_223419","attrs":{},"entity":"Analysis"},
+    {"id":"ds_91919","attrs":{"name":"sample_A017-005","data_type":"Mixed-method dependent","master_name":"SciLifelab Ancient DNA"},"entity":"Dataset"},
+    {"id":"ds_91914","attrs":{"name":"library_A017-005-S1L1","data_type":"Mixed-method dependent","master_name":"SciLifelab Ancient DNA"},"entity":"Dataset"},
+    {"id":"sl_4588","attrs":{"name":"Östergötlands län","type":"Sub-country administrative region"},"entity":"Location"},
+    {"id":"sl_3969","attrs":{"name":"Östergötland","type":"Sub-country administrative region"},"entity":"Location"},
+    {"id":"sl_4610","attrs":{"name":"Mjölby kommun","type":"Sub-country administrative region"},"entity":"Location"},
+    {"id":"sl_205","attrs":{"name":"Sweden","type":"Country"},"entity":"Location"},
+    {"id":"sl_6266","attrs":{"name":"Skänninge parish","type":"Sub-country administrative region"},"entity":"Location"},
+    {"id":"p_507","attrs":{"project_name":"SciLifeLab Ancient DNA Unit project 017"},"entity":"Project"},
+    {"id":"m_175","attrs":{"biblio_id": null, "method_id": 175, "method_name": "Ancient DNA analysis", "record_type": "DNA"},"entity":"Method"},
+    {"id":"b_10738","attrs":{"citation":"Caroline, A.A., Hedvall, R., Lundgren, M. (2020)."},"entity":"Bibliography"},
+    {"id":"av_71966","attrs":{"analysis_value":"null"},"entity":"AnalysisValue"},
+    {"id":"av_72104","attrs":{"analysis_value":"null"},"entity":"AnalysisValue"},
+    {"id":"av_71963","attrs":{"analysis_value":"V18a"},"entity":"AnalysisValue"},
+    {"id":"av_72103","attrs":{"analysis_value":"V18a"},"entity":"AnalysisValue"},
+    {"id":"av_71962","attrs":{"analysis_value":"null"},"entity":"AnalysisValue"},
+    {"id":"vc_43","attrs":{"name":"Molecular sex - Rx","value_type":"Molecular sex"},"entity":"ValueClass"},
+    {"id":"vc_42","attrs":{"name":"mtDNA haplogroup","value_type":"Identifier"},"entity":"ValueClass"},
+    {"id":"vc_41","attrs":{"name":"Y haplogroup","value_type":"Identifier"},"entity":"ValueClass"},
+    {"id":"tc_233927","attrs":{"count": 1},"entity":"TaxonCount"},
+    {"id":"taxon_47009","attrs":{"genus":"Homo","author": null,"family":"Hominidae","species":"H. sapiens"},"entity":"Taxon"}
+  ]
+}`;
+
+document.getElementById('btnDemo').onclick = ()=>{ ta.value = demoBlob; document.getElementById('btnLoad').click(); };
+
+// Auto-load demo on first open if no saved JSON
+window.addEventListener('DOMContentLoaded', ()=>{
+  setTimeout(() => {
+    if (!localStorage.getItem('sead_graph_json')) document.getElementById('btnDemo').click();
+  }, 100);
+});
+</script>
+</body>
+</html>

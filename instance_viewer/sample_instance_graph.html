@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SEAD Instance Graph – Cytoscape.js Viewer</title>
+<style>
+  /* Light mode (default) */
+  :root{
+    --bg: #ffffff; 
+    --panel: #f8fafc; 
+    --ink: #1e293b; 
+    --ink-dim: #64748b; 
+    --accent: #3b82f6; 
+    --muted: #6b7280;
+    --chip: #e2e8f0; 
+    --border: #e2e8f0; 
+    --ok: #10b981; 
+    --warn: #f59e0b;
+    --textarea-bg: #f1f5f9;
+    --pill-bg: #e2e8f0;
+    --node-text: #1e293b;
+    --edge-color: #64748b;
+    --header-gradient: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,0));
+  }
+
+  /* Dark mode */
+  @media (prefers-color-scheme: dark) {
+    :root{
+      --bg: #0b1020; 
+      --panel: #0f1733; 
+      --ink: #e6ecff; 
+      --ink-dim: #b9c3e6; 
+      --accent: #7aa2ff; 
+      --muted: #7b86a6;
+      --chip: #172043; 
+      --border: #243056; 
+      --ok: #89f0c2; 
+      --warn: #ffd581;
+      --textarea-bg: #0b132b;
+      --pill-bg: #15234a;
+      --node-text: #06111f;
+      --edge-color: #a8b3d9;
+      --header-gradient: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0));
+    }
+  }
+
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial}
+  .wrap{display:grid;grid-template-rows:auto auto 1fr;gap:12px;min-height:100%}
+  header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--header-gradient);}
+  header h1{font-size:16px;margin:0 8px 0 0;color:var(--ink)}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 12px 4px}
+  .controls > *{background:var(--panel);border:1px solid var(--border);color:var(--ink);border-radius:12px;padding:6px 10px}
+  .controls button{cursor:pointer;transition:background-color 0.2s ease;}
+  .controls button:hover{background:var(--chip);}
+  .controls input[type="file"]{padding:4px 8px}
+  .controls input[type="text"]{height:36px;min-width:260px}
+  #cy{height:calc(100vh - 220px);min-height:460px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .side{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:0 12px 12px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px}
+  .panel h3{margin:0 0 8px 0;font-size:13px;color:var(--ink-dim);letter-spacing:.2px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);color:var(--ink);padding:4px 8px;border-radius:999px;border:1px solid var(--border);font-size:12px;display:inline-flex;gap:6px;align-items:center;transition:background-color 0.2s ease;}
+  .chip:hover{background:var(--border);}
+  .chip input{margin-right:2px}
+  .legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+  .legend .item{display:flex;gap:8px;align-items:center}
+  .swatch{width:14px;height:14px;border-radius:4px;border:1px solid var(--border)}
+  textarea#json{width:100%;height:140px;background:var(--textarea-bg);color:var(--ink);border:1px solid var(--border);border-radius:10px;padding:8px}
+  .hint{color:var(--muted);font-size:12px}
+  .hint code{background:var(--chip);padding:2px 4px;border-radius:4px;font-size:11px;}
+  .attr{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px;white-space:pre-wrap;color:var(--ink);}
+  .footer{padding:8px 12px;color:var(--muted);font-size:12px}
+  .pill{padding:2px 6px;border-radius:999px;background:var(--pill-bg);border:1px solid var(--border);color:var(--ink-dim);font-size:12px}
+  hr{border:none;border-top:1px solid var(--border);margin:12px 0;}
+</style>
+<!-- libs -->
+<script src="https://unpkg.com/cytoscape@3/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://unpkg.com/cytoscape-dagre@2/cytoscape-dagre.js"></script>
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6/dist/tippy-bundle.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/animations/scale.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>SEAD Instance Graph</h1>
+      <span class="pill" id="status">idle</span>
+    </header>
+
+    <div class="controls">
+      <input type="file" id="file" accept=".json,.txt,.csv" title="Load JSON file" />
+      <button id="btnLoad">Load from textbox</button>
+      <button id="btnDemo">Load demo</button>
+      <select id="layoutSelect" title="Choose layout algorithm">
+        <option value="dagre">Dagre (Hierarchical)</option>
+        <option value="grid">Grid</option>
+        <option value="circle">Circle</option>
+        <option value="concentric">Concentric</option>
+        <option value="breadthfirst">Breadth First</option>
+        <option value="cose">CoSE (Force-directed)</option>
+        <option value="entity-radial">Entity-Radial (Properties around entities)</option>
+        <option value="spaced-grid">Spaced Grid (Maximum spacing)</option>
+        <option value="random">Random</option>
+        <option value="preset">Preset (Current positions)</option>
+      </select>
+      <button id="btnLayout">Apply Layout</button>
+      <button id="btnPng">Export PNG</button>
+      <input id="q" type="text" placeholder="Search node text… (regex ok)" />
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <h3>Paste JSON here (works with raw object, or the Postgres string you pasted)</h3>
+        <textarea id="json" placeholder='{"nodes":[...],"edges":[...]}'></textarea>
+        <div class="hint">Tips: If your SQL client wraps the JSON in a column (e.g. <code>"jsonb_build_object"</code> with a long quoted string), you can paste that entire blob here too—this viewer will extract and parse it.</div>
+      </div>
+
+      <div class="panel">
+        <h3>Legend & Filters</h3>
+        <div id="legend" class="legend"></div>
+        <hr style="border-color:#0002"/>
+        <div class="chips" id="filters"></div>
+      </div>
+    </div>
+
+    <div id="cy"></div>
+
+    <div class="side">
+      <div class="panel">
+        <h3>Selection</h3>
+        <div id="sel">Click a node or edge…</div>
+      </div>
+      <div class="panel">
+        <h3>How it works</h3>
+        <div class="hint">
+          Nodes expect: <code>{ id, entity, attrs }</code>. Label is auto‑derived from entity + a few attrs (e.g., <code>sample_name</code>, <code>site_name</code>, etc).<br/>
+          Edges expect: <code>{ source, target, rel }</code>. Edges with missing <code>source</code>/<code>target</code> are dropped.
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">Layout: Dagre (directed). Drag to rearrange; use Search to highlight matches. PNG export renders the current viewport.
+    </div>
+  </div>
+
+<script>
+// Register Cytoscape extensions when they're available
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
+    cytoscape.use(dagre);
+  }
+});
+
+// ---- Palette per entity (works in both light and dark modes) ----
+const palette = {
+  Site:        '#FDE68A',  // Light amber
+  SampleGroup: '#BFDBFE',  // Light blue
+  Sample:      '#BBF7D0',  // Light green
+  Analysis:    '#FCA5A5',  // Light red/pink
+  Dataset:     '#DDD6FE',  // Light purple
+  Location:    '#FBCFE8',  // Light pink
+  Feature:     '#FDBA74',  // Light orange
+  Project:     '#A7F3D0',  // Light teal
+  Method:      '#93C5FD',  // Medium blue
+  Bibliography:'#E9D5FF',  // Very light purple
+  AnalysisValue:'#F9A8D4', // Light magenta
+  ValueClass:  '#E5E7EB',  // Light gray
+  TaxonCount:  '#C7D2FE',  // Light indigo
+  MeasuredValue:'#FEF3C7', // Very light amber
+  Taxon:       '#D1FAE5'   // Very light green
+};
+
+let cy;
+const status = (s) => document.getElementById('status').textContent = s;
+
+// Function to get current CSS variable values
+function getCSSVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// Function to update cytoscape styles when theme changes
+function updateCytoscapeStyles() {
+  if (!cy) return;
+  cy.style()
+    .selector('node')
+    .style({
+      'border-color': getCSSVar('--border'),
+      'color': getCSSVar('--node-text')
+    })
+    .selector('edge')
+    .style({
+      'line-color': getCSSVar('--edge-color'),
+      'target-arrow-color': getCSSVar('--edge-color'),
+      'text-background-color': getCSSVar('--panel'),
+      'color': getCSSVar('--ink-dim')
+    })
+    .selector('.highlight')
+    .style({
+      'border-color': getCSSVar('--accent')
+    })
+    .selector('edge.highlight')
+    .style({
+      'line-color': getCSSVar('--accent'),
+      'target-arrow-color': getCSSVar('--accent')
+    })
+    .update();
+}
+
+// Listen for theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateCytoscapeStyles);
+
+function parseMaybeWrapped(input){
+  // Accept: raw JSON object OR a two-column dump where the second column is a JSON string
+  try{
+    // Try direct JSON first
+    if (typeof input === 'string') input = input.trim();
+    if (typeof input === 'string' && input.startsWith('{')) return JSON.parse(input);
+
+    // If it's a Postgres-ish pair like: "jsonb_build_object" \n "{...}"  OR an entire CSV/line with quoted JSON
+    const match = input.match(/\{[\s\S]*\}$/); // last {...}
+    if (match) return JSON.parse(match[0]);
+  }catch(e){
+    console.error('Parse error', e);
+  }
+  throw new Error('Could not parse JSON. Paste either the raw object {nodes,edges} or the quoted JSON string.');
+}
+
+function labelFrom(node){
+  const e = node.entity;
+  const a = node.attrs || {};
+  const id = node.id || '';
+  const lines = [];
+  
+  // Always show entity type first
+  lines.push(`[${e}]`);
+  
+  // Primary title per entity
+  const primary = (
+    e === 'Sample' ? (a.sample_name || id) :
+    e === 'Site' ? (a.site_name || id) :
+    e === 'SampleGroup' ? (a.sample_group_name || id) :
+    e === 'Dataset' ? (a.dataset_name || id) :
+    e === 'Analysis' ? (a.analysis_entity_id ? ('AE ' + a.analysis_entity_id) : id) :
+    e === 'Location' ? (a.location_name || id) :
+    e === 'Project' ? (a.project_name || id) :
+    e === 'Method' ? (a.method_name || id) :
+    e === 'Bibliography' ? (a.citation || id) :
+    e === 'ValueClass' ? (a.name || id) :
+    e === 'AnalysisValue' ? (a.analysis_value ?? ('AV ' + (a.analysis_value_id||''))) :
+    e === 'MeasuredValue' ? (String(a.measured_value)) :
+    e === 'TaxonCount' ? ('Count ' + (a.count ?? '')) :
+    e === 'Taxon' ? ([a.genus_name, a.species].filter(Boolean).join(' ') || id) :
+    id
+  );
+  lines.push(primary);
+  
+  // A couple of secondary hints
+  if (e==='Sample' && a.sample_type) lines.push(a.sample_type);
+  if (e==='Site' && Array.isArray(a.coordinate)) lines.push(a.coordinate.join(', '));
+  if (e==='Dataset' && a.data_type) lines.push(a.data_type);
+  if (e==='Analysis' && a.dataset_id) lines.push('ds_'+a.dataset_id);
+  if (e==='TaxonCount' && a.taxon_id) lines.push('taxon_'+a.taxon_id);
+  return lines.join('\n');
+}
+
+function makeElements(graph){
+  const nodes = [];
+  const edges = [];
+  
+  // Create main entity nodes (simplified labels)
+  (graph.nodes||[]).forEach(n => {
+    nodes.push({
+      data: {
+        id: n.id,
+        entity: n.entity,
+        label: `[${n.entity}]\n${getMainLabel(n)}`,
+        attrs: n.attrs || {},
+        nodeType: 'entity'
+      }
+    });
+    
+    // Create property nodes for each attribute
+    const attrs = n.attrs || {};
+    Object.entries(attrs).forEach(([key, value], index) => {
+      if (value !== null && value !== undefined && key !== 'coordinate') {
+        const propId = `${n.id}_prop_${key}`;
+        const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+        
+        nodes.push({
+          data: {
+            id: propId,
+            entity: 'Property',
+            label: displayValue,
+            nodeType: 'property',
+            propertyKey: key
+          }
+        });
+        
+        // Create dashed edge from entity to property
+        edges.push({
+          data: {
+            id: `${n.id}_to_${propId}`,
+            source: n.id,
+            target: propId,
+            rel: key,
+            edgeType: 'property'
+          }
+        });
+      }
+    });
+  });
+  
+  // Add original relationship edges
+  (graph.edges||[])
+    .filter(e => e && e.source && e.target)
+    .forEach((e, i) => {
+      edges.push({
+        data: {
+          id: 'e'+i,
+          source: e.source,
+          target: e.target,
+          rel: e.rel||'',
+          edgeType: 'relationship'
+        }
+      });
+    });
+    
+  return {nodes, edges};
+}
+
+function getMainLabel(node) {
+  const e = node.entity;
+  const a = node.attrs || {};
+  const id = node.id || '';
+  
+  // Return just the primary identifier without extra details
+  return (
+    e === 'Sample' ? (a.sample_name || id) :
+    e === 'Site' ? (a.site_name || id) :
+    e === 'SampleGroup' ? (a.sample_group_name || id) :
+    e === 'Dataset' ? (a.dataset_name || id) :
+    e === 'Analysis' ? (a.analysis_entity_id ? ('AE ' + a.analysis_entity_id) : id) :
+    e === 'Location' ? (a.location_name || id) :
+    e === 'Project' ? (a.project_name || id) :
+    e === 'Method' ? (a.method_name || id) :
+    e === 'Bibliography' ? (a.citation || id) :
+    e === 'ValueClass' ? (a.name || id) :
+    e === 'AnalysisValue' ? (a.analysis_value ?? ('AV ' + (a.analysis_value_id||''))) :
+    e === 'MeasuredValue' ? (String(a.measured_value)) :
+    e === 'TaxonCount' ? ('Count ' + (a.count ?? '')) :
+    e === 'Taxon' ? ([a.genus_name, a.species].filter(Boolean).join(' ') || id) :
+    id
+  );
+}
+
+function buildLegendAndFilters(graph){
+  const entSet = new Set((graph.nodes||[]).map(n=>n.entity));
+  // Remove 'Property' from entity set since we don't want to filter properties
+  entSet.delete('Property');
+  
+  const legend = document.getElementById('legend');
+  const filters = document.getElementById('filters');
+  legend.innerHTML = '';
+  filters.innerHTML = '';
+  
+  [...entSet].sort().forEach(ent=>{
+    const color = palette[ent] || '#eee';
+    const item = document.createElement('div');
+    item.className='item';
+    item.innerHTML = `<span class="swatch" style="background:${color}"></span> <span>${ent}</span>`;
+    legend.appendChild(item);
+
+    const chip = document.createElement('label');
+    chip.className = 'chip';
+    const id = 'f_'+ent;
+    chip.innerHTML = `<input type="checkbox" id="${id}" checked> ${ent}`;
+    chip.querySelector('input').addEventListener('change', (ev)=>{
+      const show = ev.target.checked;
+      const sel = `node[entity = "${ent}"]`;
+      const nodes = cy.$(sel);
+      show ? nodes.show() : nodes.hide();
+      
+      // Also hide/show connected property nodes
+      if (show) {
+        nodes.connectedEdges('[edgeType = "property"]').connectedNodes('[nodeType = "property"]').show();
+        nodes.connectedEdges('[edgeType = "property"]').show();
+      } else {
+        nodes.connectedEdges('[edgeType = "property"]').connectedNodes('[nodeType = "property"]').hide();
+        nodes.connectedEdges('[edgeType = "property"]').hide();
+      }
+    });
+    filters.appendChild(chip);
+  });
+  
+  // Add a special filter for properties
+  const propChip = document.createElement('label');
+  propChip.className = 'chip';
+  propChip.innerHTML = `<input type="checkbox" id="f_properties" checked> Properties`;
+  propChip.querySelector('input').addEventListener('change', (ev)=>{
+    const show = ev.target.checked;
+    const propNodes = cy.$('node[nodeType = "property"]');
+    const propEdges = cy.$('edge[edgeType = "property"]');
+    show ? (propNodes.show(), propEdges.show()) : (propNodes.hide(), propEdges.hide());
+  });
+  filters.appendChild(propChip);
+}
+
+function attachTooltips(){
+  // tippy for nodes: show pretty JSON of attrs
+  cy.nodes().forEach(n=>{
+    const content = document.createElement('div');
+    content.className='attr';
+    
+    let obj;
+    if (n.data('nodeType') === 'property') {
+      obj = { 
+        id: n.id(), 
+        type: 'Property',
+        key: n.data('propertyKey'),
+        value: n.data('label')
+      };
+    } else {
+      obj = { 
+        id: n.id(), 
+        entity: n.data('entity'), 
+        attrs: n.data('attrs') 
+      };
+    }
+    
+    content.textContent = JSON.stringify(obj, null, 2);
+    
+    // Destroy existing tooltip if it exists
+    if (n.tippy) {
+      n.tippy.destroy();
+    }
+    
+    // Create a dummy element for tippy reference
+    const dummyElement = document.createElement('div');
+    
+    n.tippy = tippy(dummyElement, {
+      getReferenceClientRect: () => {
+        const bb = n.renderedBoundingBox();
+        return {
+          width: bb.w,
+          height: bb.h,
+          top: bb.y1,
+          bottom: bb.y2,
+          left: bb.x1,
+          right: bb.x2
+        };
+      },
+      appendTo: document.body,
+      interactive: true,
+      trigger: 'manual',
+      theme: 'light-border',
+      animation: 'scale',
+      content
+    });
+    
+    n.on('mouseover', ()=> n.tippy.show());
+    n.on('mouseout',  ()=> n.tippy.hide());
+  });
+}
+
+function getLayoutOptions(layoutName) {
+  const baseOptions = {
+    animate: true,
+    animationDuration: 500,
+    fit: true,
+    padding: 20
+  };
+
+  switch (layoutName) {
+    case 'dagre':
+      return {
+        ...baseOptions,
+        name: 'dagre',
+        rankDir: 'LR',
+        align: 'UL',
+        nodeSep: 20,
+        rankSep: 60,
+        edgeSep: 10,
+        ranker: 'tight-tree'
+      };
+    case 'grid':
+      return {
+        ...baseOptions,
+        name: 'grid',
+        rows: undefined,
+        cols: undefined,
+        position: function(node) { return { row: node.data('row'), col: node.data('col') }; },
+        sort: undefined,
+        animate: false
+      };
+    case 'circle':
+      return {
+        ...baseOptions,
+        name: 'circle',
+        radius: undefined,
+        spacingFactor: 1.5,
+        startAngle: -Math.PI / 2
+      };
+    case 'concentric':
+      return {
+        ...baseOptions,
+        name: 'concentric',
+        concentric: function(node) {
+          // Entity nodes in center, properties on outside
+          return node.data('nodeType') === 'entity' ? 2 : 1;
+        },
+        levelWidth: function(nodes) { return nodes.maxDegree() / 4; },
+        spacingFactor: 2,
+        minNodeSpacing: 50
+      };
+    case 'breadthfirst':
+      return {
+        ...baseOptions,
+        name: 'breadthfirst',
+        directed: true,
+        spacingFactor: 1.5,
+        maximal: false,
+        grid: false
+      };
+    case 'cose':
+      return {
+        ...baseOptions,
+        name: 'cose',
+        padding: 60, // More padding for less compression
+        // Pre-position properties around their entities before physics
+        ready: function() {
+          const cy = this;
+          cy.nodes('[nodeType = "entity"]').forEach(function(node) {
+            // Find all property nodes connected to this entity
+            const propertyEdges = node.connectedEdges('[edgeType = "property"]');
+            const propertyNodes = propertyEdges.connectedNodes('[nodeType = "property"]');
+            
+            if (propertyNodes.length > 0) {
+              const centerPos = node.position();
+              const radius = Math.min(45, Math.max(30, 50 - propertyNodes.length * 1.5)); // Adaptive closer radius
+              const angleStep = (2 * Math.PI) / propertyNodes.length;
+              const startAngle = Math.random() * Math.PI; // Some randomness
+              
+              propertyNodes.forEach(function(propNode, index) {
+                const angle = startAngle + (angleStep * index);
+                const x = centerPos.x + radius * Math.cos(angle);
+                const y = centerPos.y + radius * Math.sin(angle);
+                propNode.position({ x: x, y: y });
+              });
+            }
+          });
+        },
+        nodeRepulsion: function(node) { 
+          // Much stronger repulsion for entities to spread them out
+          return node.data('nodeType') === 'property' ? 400 : 15000; 
+        },
+        nodeOverlap: 20, // More space between nodes
+        idealEdgeLength: function(edge) { 
+          // Very short for properties, much longer for relationships
+          return edge.data('edgeType') === 'property' ? 15 : 300; 
+        },
+        edgeElasticity: function(edge) { 
+          // Very high elasticity to keep properties close
+          return edge.data('edgeType') === 'property' ? 3000 : 50; 
+        },
+        nestingFactor: 1.1,
+        gravity: 30, // Lower gravity to reduce center clustering
+        numIter: 2500, // More iterations for better settling
+        initialTemp: 800,
+        coolingFactor: 0.98,
+        minTemp: 1.0,
+        randomize: false,
+        componentSpacing: 150 // More space between disconnected components
+      };
+    case 'entity-radial':
+      return {
+        ...baseOptions,
+        name: 'preset',
+        animate: true,
+        animationDuration: 800,
+        fit: true,
+        padding: 50, // More padding for less compressed graph
+        positions: function(node) {
+          // Let the algorithm calculate all positions
+          return undefined;
+        },
+        // Custom positioning logic
+        ready: function() {
+          const cy = this;
+          const entityNodes = cy.nodes('[nodeType = "entity"]');
+          const propertyNodes = cy.nodes('[nodeType = "property"]');
+          
+          // First, run a spacious layout for entities only
+          const entityLayout = entityNodes.layout({
+            name: 'breadthfirst',
+            directed: true,
+            spacingFactor: 3, // Much more spacing
+            avoidOverlap: true,
+            nodeDimensionsIncludeLabels: true,
+            animate: false,
+            fit: false
+          });
+          
+          entityLayout.run();
+          
+          // Wait for entity layout to complete, then position properties
+          entityLayout.one('layoutstop', function() {
+            entityNodes.forEach(function(entityNode) {
+              const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
+              const propNodes = propEdges.connectedNodes('[nodeType = "property"]');
+              
+              if (propNodes.length > 0) {
+                const centerPos = entityNode.position();
+                const radius = Math.min(50, Math.max(35, 50 - propNodes.length * 2)); // Adaptive radius: closer for many properties
+                const angleStep = (2 * Math.PI) / propNodes.length;
+                const startAngle = Math.random() * Math.PI * 2; // Random start angle for variety
+                
+                propNodes.forEach(function(propNode, index) {
+                  const angle = startAngle + (angleStep * index);
+                  const x = centerPos.x + radius * Math.cos(angle);
+                  const y = centerPos.y + radius * Math.sin(angle);
+                  propNode.position({ x: x, y: y });
+                });
+              }
+            });
+            
+            // Final fit with more padding for less compression
+            cy.fit(cy.elements(), 80);
+            
+            // Optional: Add a gentle animation to settle any overlaps
+            setTimeout(() => {
+              cy.animate({
+                fit: { eles: cy.elements(), padding: 60 }
+              }, {
+                duration: 500
+              });
+            }, 200);
+          });
+        }
+      };
+    case 'spaced-grid':
+      return {
+        ...baseOptions,
+        name: 'preset',
+        animate: true,
+        animationDuration: 1000,
+        fit: true,
+        padding: 80,
+        ready: function() {
+          const cy = this;
+          const entityNodes = cy.nodes('[nodeType = "entity"]');
+          const propertyNodes = cy.nodes('[nodeType = "property"]');
+          
+          // Calculate grid dimensions for entities
+          const entityCount = entityNodes.length;
+          const cols = Math.ceil(Math.sqrt(entityCount));
+          const rows = Math.ceil(entityCount / cols);
+          
+          // Large spacing between entities
+          const cellWidth = 300;
+          const cellHeight = 250;
+          const startX = -(cols * cellWidth) / 2;
+          const startY = -(rows * cellHeight) / 2;
+          
+          // Position entities in a spacious grid
+          entityNodes.forEach(function(node, index) {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const x = startX + (col * cellWidth) + (cellWidth / 2);
+            const y = startY + (row * cellHeight) + (cellHeight / 2);
+            node.position({ x: x, y: y });
+          });
+          
+          // Position properties very close to their entities
+          entityNodes.forEach(function(entityNode) {
+            const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
+            const propNodes = propEdges.connectedNodes('[nodeType = "property"]');
+            
+            if (propNodes.length > 0) {
+              const centerPos = entityNode.position();
+              const radius = 35; // Very close to entity
+              const angleStep = (2 * Math.PI) / propNodes.length;
+              
+              propNodes.forEach(function(propNode, index) {
+                const angle = angleStep * index;
+                const x = centerPos.x + radius * Math.cos(angle);
+                const y = centerPos.y + radius * Math.sin(angle);
+                propNode.position({ x: x, y: y });
+              });
+            }
+          });
+          
+          // Fit with generous padding
+          cy.fit(cy.elements(), 100);
+        }
+      };
+    case 'random':
+      return {
+        ...baseOptions,
+        name: 'random'
+      };
+    case 'preset':
+      return {
+        ...baseOptions,
+        name: 'preset',
+        positions: undefined,
+        zoom: undefined,
+        pan: undefined,
+        animate: false
+      };
+    default:
+      return {
+        ...baseOptions,
+        name: 'grid'
+      };
+  }
+}
+
+function render(graph){
+  status('rendering…');
+  const {nodes, edges} = makeElements(graph);
+  if (cy) { cy.destroy(); }
+
+  // Ensure dagre is available and registered
+  if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
+    try {
+      cytoscape.use(dagre);
+    } catch (e) {
+      // dagre already registered
+    }
+  }
+
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: { nodes, edges },
+    layout: getLayoutOptions(document.getElementById('layoutSelect')?.value || 'dagre'),
+    wheelSensitivity: 2.0,
+    style: [
+      // Entity nodes (main nodes with boxes)
+      { selector:'node[nodeType = "entity"]', style:{
+        'shape':'round-rectangle',
+        'background-color': n => (palette[n.data('entity')] || getCSSVar('--chip')),
+        'border-width': 2, 'border-color': getCSSVar('--border'),
+        'label':'data(label)', 'font-size':'11px', 'text-wrap':'wrap','text-max-width':'140px',
+        'width': 'label', 'height': 'label', 'padding':'12px',
+        'color':'#000000', 'text-valign':'center', 'text-halign':'center',
+        'min-width':'80px', 'min-height':'40px'
+      }},
+      // Property nodes (text only, no box)
+      { selector:'node[nodeType = "property"]', style:{
+        'shape':'rectangle',
+        'background-color': 'transparent',
+        'border-width': 0,
+        'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'120px',
+        'width': '20px', 'height': '20px',
+        'color': getCSSVar('--ink-dim'), 'text-valign':'center', 'text-halign':'center'
+      }},
+      // Relationship edges (solid)
+      { selector:'edge[edgeType = "relationship"]', style:{
+        'curve-style':'bezier', 'target-arrow-shape':'triangle', 'arrow-scale':0.8,
+        'width':2, 
+        'line-color': getCSSVar('--edge-color'), 
+        'target-arrow-color': getCSSVar('--edge-color'),
+        'label':'data(rel)', 'font-size':'9px', 
+        'text-background-color': getCSSVar('--panel'),
+        'text-background-opacity':0.9, 'text-background-padding':'3px',
+        'color': getCSSVar('--ink-dim')
+      }},
+      // Property edges (dashed)
+      { selector:'edge[edgeType = "property"]', style:{
+        'curve-style':'straight', 'target-arrow-shape':'none',
+        'width':1, 'line-style':'dashed',
+        'line-color': getCSSVar('--muted'), 
+        'label':'data(rel)', 'font-size':'8px',
+        'text-background-color': getCSSVar('--panel'),
+        'text-background-opacity':0.7, 'text-background-padding':'2px',
+        'color': getCSSVar('--ink-dim'),
+        'opacity': 0.6,
+        'edge-distances': 'node-position',
+        'source-distance-from-node': 5,
+        'target-distance-from-node': 5
+      }},
+      { selector:'.highlight', style:{ 'border-width':3, 'border-color': getCSSVar('--accent') }},
+      { selector:'edge.highlight', style:{ 'width':3, 'line-color': getCSSVar('--accent'), 'target-arrow-color': getCSSVar('--accent') }}
+    ]
+  });
+
+  // selection panel
+  const sel = document.getElementById('sel');
+  const setSel = (html) => sel.innerHTML = html;
+  cy.on('select unselect', 'node,edge', () => {
+    const n = cy.$(':selected');
+    if (!n.length) { setSel('Click a node or edge…'); return; }
+    const el = n[0];
+    if (el.isNode()){
+      setSel(`<div><strong>Node:</strong> ${el.id()}</div><div class="attr">${JSON.stringify(el.data(), null, 2)}</div>`);
+    } else {
+      setSel(`<div><strong>Edge:</strong> ${el.id()}</div><div class="attr">${JSON.stringify(el.data(), null, 2)}</div>`);
+    }
+  });
+
+  // attachTooltips();
+  buildLegendAndFilters(graph);
+  status(`${graph.nodes?.length||0} nodes • ${graph.edges?.filter(e=>e&&e.source&&e.target).length||0} edges`);
+}
+
+// --- controls ---
+const ta = document.getElementById('json');
+
+document.getElementById('btnLoad').onclick = () => {
+  try{ render(parseMaybeWrapped(ta.value)); } catch(e){ alert(e.message); }
+};
+
+document.getElementById('file').onchange = async (ev) => {
+  const f = ev.target.files[0]; if(!f) return;
+  const txt = await f.text(); ta.value = txt; document.getElementById('btnLoad').click();
+};
+
+document.getElementById('btnLayout').onclick = () => {
+  if (!cy) return;
+  const selectedLayout = document.getElementById('layoutSelect').value;
+  cy.layout(getLayoutOptions(selectedLayout)).run();
+};
+
+document.getElementById('btnPng').onclick = () => {
+  if (!cy) return;
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const bgColor = isDark ? '#0b1020' : '#ffffff';
+  const png = cy.png({ full:false, scale:2, bg:bgColor });
+  const a = document.createElement('a'); a.href = png; a.download = 'sead_instance.png'; a.click();
+};
+
+// Search/highlight
+const q = document.getElementById('q');
+q.addEventListener('input', () => {
+  if (!cy) return;
+  cy.$('.highlight').removeClass('highlight');
+  const term = q.value.trim(); if (!term) return;
+  let sel;
+  try { sel = cy.nodes().filter(n => new RegExp(term, 'i').test(n.data('label'))); }
+  catch { sel = cy.nodes().filter(n => (n.data('label')||'').toLowerCase().includes(term.toLowerCase())); }
+  sel.addClass('highlight');
+  cy.edges().filter(e=> sel.contains(e.source()) || sel.contains(e.target())).addClass('highlight');
+});
+
+// --- Demo loader from external file ---
+let demoData = null;
+
+// Function to load demo data from external file
+async function loadDemoData() {
+  try {
+    const response = await fetch('./demo_graph.json');
+    if (response.ok) {
+      demoData = await response.json();
+      return true;
+    }
+  } catch (error) {
+    console.warn('Could not load demo_graph.json:', error.message);
+  }
+  return false;
+}
+
+document.getElementById('btnDemo').onclick = () => {
+  if (demoData) {
+    ta.value = JSON.stringify(demoData);
+    document.getElementById('btnLoad').click();
+  } else {
+    alert('Demo data not available. Please load your own JSON data.');
+  }
+};
+
+// Auto-load demo on first open if demo file exists
+window.addEventListener('DOMContentLoaded', async () => {
+  const demoLoaded = await loadDemoData();
+  if (demoLoaded) {
+    // Small delay to ensure all scripts are loaded
+    setTimeout(() => {
+      document.getElementById('btnDemo').click();
+    }, 100);
+  } else {
+    status('Demo data not found. Load your own JSON file or paste data.');
+  }
+});
+</script>
+</body>
+</html>
