@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SEAD Instance Graph – Cytoscape.js Viewer</title>
+<title>SEAD Instance Graph - Cytoscape.js Viewer</title>
 <style>
   /* Light mode (default) */
   :root{
@@ -94,6 +94,7 @@
       <button id="btnLoad">Load from textbox</button>
       <button id="btnDemo">Load demo</button>
       <select id="layoutSelect" title="Choose layout algorithm">
+        <option value="database-schema">Database Schema (Fixed positions)</option>
         <option value="dagre">Dagre (Hierarchical)</option>
         <option value="grid">Grid</option>
         <option value="circle">Circle</option>
@@ -107,6 +108,7 @@
       </select>
       <button id="btnLayout">Apply Layout</button>
       <button id="btnPng">Export PNG</button>
+      <button id="btnDebug">Debug Nodes</button>
       <input id="q" type="text" placeholder="Search node text… (regex ok)" />
     </div>
 
@@ -146,12 +148,7 @@
   </div>
 
 <script>
-// Register Cytoscape extensions when they're available
-document.addEventListener('DOMContentLoaded', () => {
-  if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
-    cytoscape.use(dagre);
-  }
-});
+// Note: Dagre extension will be registered when the libraries are fully loaded
 
 // ---- Palette per entity (works in both light and dark modes) ----
 const palette = {
@@ -227,55 +224,22 @@ function parseMaybeWrapped(input){
   throw new Error('Could not parse JSON. Paste either the raw object {nodes,edges} or the quoted JSON string.');
 }
 
-function labelFrom(node){
-  const e = node.entity;
-  const a = node.attrs || {};
-  const id = node.id || '';
-  const lines = [];
-  
-  // Always show entity type first
-  lines.push(`[${e}]`);
-  
-  // Primary title per entity
-  const primary = (
-    e === 'Sample' ? (a.sample_name || id) :
-    e === 'Site' ? (a.site_name || id) :
-    e === 'SampleGroup' ? (a.sample_group_name || id) :
-    e === 'Dataset' ? (a.dataset_name || id) :
-    e === 'Analysis' ? (a.analysis_entity_id ? ('AE ' + a.analysis_entity_id) : id) :
-    e === 'Location' ? (a.location_name || id) :
-    e === 'Project' ? (a.project_name || id) :
-    e === 'Method' ? (a.method_name || id) :
-    e === 'Bibliography' ? (a.citation || id) :
-    e === 'ValueClass' ? (a.name || id) :
-    e === 'AnalysisValue' ? (a.analysis_value ?? ('AV ' + (a.analysis_value_id||''))) :
-    e === 'MeasuredValue' ? (String(a.measured_value)) :
-    e === 'TaxonCount' ? ('Count ' + (a.count ?? '')) :
-    e === 'Taxon' ? ([a.genus_name, a.species].filter(Boolean).join(' ') || id) :
-    id
-  );
-  lines.push(primary);
-  
-  // A couple of secondary hints
-  if (e==='Sample' && a.sample_type) lines.push(a.sample_type);
-  if (e==='Site' && Array.isArray(a.coordinate)) lines.push(a.coordinate.join(', '));
-  if (e==='Dataset' && a.data_type) lines.push(a.data_type);
-  if (e==='Analysis' && a.dataset_id) lines.push('ds_'+a.dataset_id);
-  if (e==='TaxonCount' && a.taxon_id) lines.push('taxon_'+a.taxon_id);
-  return lines.join('\n');
-}
-
 function makeElements(graph){
   const nodes = [];
   const edges = [];
   
-  // Create main entity nodes (simplified labels)
+  // Create main entity nodes (using label from JSON data)
   (graph.nodes||[]).forEach(n => {
+    // Use the label from JSON data, or fall back to ID
+    const mainLabel = n.label || n.id;
+    // Format: [Entity]\nLabel
+    const nodeLabel = `[${n.entity}]\n${mainLabel}`;
+    
     nodes.push({
       data: {
         id: n.id,
         entity: n.entity,
-        label: `[${n.entity}]\n${getMainLabel(n)}`,
+        label: nodeLabel,
         attrs: n.attrs || {},
         nodeType: 'entity'
       }
@@ -313,9 +277,8 @@ function makeElements(graph){
   });
   
   // Add original relationship edges
-  (graph.edges||[])
-    .filter(e => e && e.source && e.target)
-    .forEach((e, i) => {
+  (graph.edges||[]).forEach((e, i) => {
+    if (e && e.source && e.target && e.target !== null) {
       edges.push({
         data: {
           id: 'e'+i,
@@ -325,40 +288,22 @@ function makeElements(graph){
           edgeType: 'relationship'
         }
       });
-    });
+    } else {
+      console.warn('Skipping edge with missing source/target:', e);
+    }
+  });
     
   return {nodes, edges};
-}
-
-function getMainLabel(node) {
-  const e = node.entity;
-  const a = node.attrs || {};
-  const id = node.id || '';
-  
-  // Return just the primary identifier without extra details
-  return (
-    e === 'Sample' ? (a.sample_name || id) :
-    e === 'Site' ? (a.site_name || id) :
-    e === 'SampleGroup' ? (a.sample_group_name || id) :
-    e === 'Dataset' ? (a.dataset_name || id) :
-    e === 'Analysis' ? (a.analysis_entity_id ? ('AE ' + a.analysis_entity_id) : id) :
-    e === 'Location' ? (a.location_name || id) :
-    e === 'Project' ? (a.project_name || id) :
-    e === 'Method' ? (a.method_name || id) :
-    e === 'Bibliography' ? (a.citation || id) :
-    e === 'ValueClass' ? (a.name || id) :
-    e === 'AnalysisValue' ? (a.analysis_value ?? ('AV ' + (a.analysis_value_id||''))) :
-    e === 'MeasuredValue' ? (String(a.measured_value)) :
-    e === 'TaxonCount' ? ('Count ' + (a.count ?? '')) :
-    e === 'Taxon' ? ([a.genus_name, a.species].filter(Boolean).join(' ') || id) :
-    id
-  );
 }
 
 function buildLegendAndFilters(graph){
   const entSet = new Set((graph.nodes||[]).map(n=>n.entity));
   // Remove 'Property' from entity set since we don't want to filter properties
   entSet.delete('Property');
+  
+  console.log('=== BUILDING LEGEND ===');
+  console.log('Input graph nodes:', graph.nodes?.length || 0);
+  console.log('Unique entities found:', [...entSet].sort());
   
   const legend = document.getElementById('legend');
   const filters = document.getElementById('filters');
@@ -376,10 +321,26 @@ function buildLegendAndFilters(graph){
     chip.className = 'chip';
     const id = 'f_'+ent;
     chip.innerHTML = `<input type="checkbox" id="${id}" checked> ${ent}`;
+    
+    // Debug: Check if Site nodes are found when creating filter
+    if (ent === 'Site') {
+      const siteNodes = cy.$(`node[entity = "Site"]`);
+      console.log(`Creating filter for Site: found ${siteNodes.length} nodes`);
+      siteNodes.forEach(function(node) {
+        console.log('Site node details:', {
+          id: node.id(),
+          position: node.position(),
+          visible: node.visible(),
+          entity: node.data('entity')
+        });
+      });
+    }
+    
     chip.querySelector('input').addEventListener('change', (ev)=>{
       const show = ev.target.checked;
       const sel = `node[entity = "${ent}"]`;
       const nodes = cy.$(sel);
+      console.log(`Filter ${ent}: ${show ? 'showing' : 'hiding'} ${nodes.length} nodes`);
       show ? nodes.show() : nodes.hide();
       
       // Also hide/show connected property nodes
@@ -473,7 +434,78 @@ function getLayoutOptions(layoutName) {
   };
 
   switch (layoutName) {
+    case 'database-schema':
+      return {
+        ...baseOptions,
+        name: 'preset',
+        animate: true,
+        animationDuration: 800,
+        fit: true,
+        padding: 60,
+        positions: function(node) {
+          // Define fixed positions based on entity types
+          const positions = {
+            // Core hierarchy - left side
+            Site: { x: 0, y: 0 },
+            SampleGroup: { x: 0, y: 150 },
+            Sample: { x: 0, y: 300 },
+            
+            // Locations - top left
+            Location: { x: -200, y: -100 },
+            
+            // Analysis branch - center
+            Analysis: { x: 200, y: 250 },
+            Dataset: { x: 200, y: 400 },
+            
+            // Analysis values and classifications - right side
+            AnalysisValue: { x: 400, y: 150 },
+            ValueClass: { x: 600, y: 150 },
+            
+            // Taxonomic data - bottom right
+            TaxonCount: { x: 400, y: 350 },
+            Taxon: { x: 600, y: 350 },
+            
+            // Measured values - bottom center
+            MeasuredValue: { x: 300, y: 400 },
+            
+            // Methods and bibliography - far right
+            Method: { x: 800, y: 0 },
+            Bibliography: { x: 800, y: 100 },
+            
+            // Projects - top right
+            Project: { x: 400, y: -50 }
+          };
+          
+          const nodeType = node.data('nodeType');
+          const entity = node.data('entity');
+          
+          if (nodeType === 'entity') {
+            // Position entity nodes
+            let basePos = positions[entity] || { x: 0, y: 500 };
+            
+            // If multiple nodes of same entity type, we'll spread them out
+            // For now, just return the base position - spreading will be handled after layout
+            return {
+              x: basePos.x,
+              y: basePos.y
+            };
+          } else if (nodeType === 'property') {
+            // Properties will be positioned around their parent entities after the layout runs
+            return { x: 0, y: 0 }; // Temporary position
+          }
+          
+          return { x: 0, y: 0 }; // Default fallback
+        }
+      };
     case 'dagre':
+      // Register dagre extension if not already registered
+      if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
+        try {
+          cytoscape.use(dagre);
+        } catch (e) {
+          // Already registered or error - continue anyway
+        }
+      }
       return {
         ...baseOptions,
         name: 'dagre',
@@ -530,7 +562,7 @@ function getLayoutOptions(layoutName) {
         padding: 60, // More padding for less compression
         // Pre-position properties around their entities before physics
         ready: function() {
-          const cy = this;
+          if (!cy) return;
           cy.nodes('[nodeType = "entity"]').forEach(function(node) {
             // Find all property nodes connected to this entity
             const propertyEdges = node.connectedEdges('[edgeType = "property"]');
@@ -587,7 +619,7 @@ function getLayoutOptions(layoutName) {
         },
         // Custom positioning logic
         ready: function() {
-          const cy = this;
+          if (!cy) return;
           const entityNodes = cy.nodes('[nodeType = "entity"]');
           const propertyNodes = cy.nodes('[nodeType = "property"]');
           
@@ -648,7 +680,7 @@ function getLayoutOptions(layoutName) {
         fit: true,
         padding: 80,
         ready: function() {
-          const cy = this;
+          if (!cy) return;
           const entityNodes = cy.nodes('[nodeType = "entity"]');
           const propertyNodes = cy.nodes('[nodeType = "property"]');
           
@@ -717,24 +749,156 @@ function getLayoutOptions(layoutName) {
   }
 }
 
+// Function to ensure all nodes are visible (simpler version for non-database layouts)
+function ensureNodesVisible() {
+  if (!cy) return;
+  
+  console.log('Ensuring all nodes are visible...');
+  console.log('Total nodes:', cy.nodes().length);
+  
+  let fixedCount = 0;
+  cy.nodes().forEach(function(node) {
+    const pos = node.position();
+    if (!pos || (pos.x === 0 && pos.y === 0) || isNaN(pos.x) || isNaN(pos.y)) {
+      // Give nodes without proper positions a default position
+      node.position({ x: Math.random() * 400 + 100, y: Math.random() * 400 + 100 });
+      fixedCount++;
+      console.log('Fixed position for node:', node.id(), node.data('entity') || node.data('label'));
+    }
+  });
+  
+  console.log('Fixed positions for', fixedCount, 'nodes');
+  
+  // Fit the view to show all nodes
+  if (fixedCount > 0) {
+    cy.fit(cy.elements(), 50);
+  }
+}
+
+// Function to apply database schema positioning
+function applyDatabaseSchemaPositioning() {
+  if (!cy) return;
+  
+  console.log('Applying database schema positioning...');
+  console.log('Total nodes:', cy.nodes().length);
+  console.log('Entity nodes:', cy.nodes('[nodeType = "entity"]').length);
+  console.log('Property nodes:', cy.nodes('[nodeType = "property"]').length);
+  
+  // Ensure all nodes are visible first
+  cy.nodes().forEach(function(node) {
+    const pos = node.position();
+    if (!pos || (pos.x === 0 && pos.y === 0)) {
+      // Give nodes without proper positions a default position
+      node.position({ x: Math.random() * 200, y: Math.random() * 200 });
+      console.log('Fixed position for node:', node.id(), node.data('entity'));
+    }
+  });
+  
+  // Handle multiple entities of same type - spread them out
+  const entityGroups = {};
+  cy.nodes('[nodeType = "entity"]').forEach(function(node) {
+    const entity = node.data('entity');
+    if (!entityGroups[entity]) {
+      entityGroups[entity] = [];
+    }
+    entityGroups[entity].push(node);
+  });
+  
+  // Spread out multiple entities of same type vertically
+  Object.values(entityGroups).forEach(function(nodes) {
+    if (nodes.length > 1) {
+      nodes.forEach(function(node, index) {
+        const pos = node.position();
+        node.position({
+          x: pos.x,
+          y: pos.y + (index * 80) // Vertical spacing instead of horizontal
+        });
+      });
+    }
+  });
+  
+  // Position property nodes around their entities
+  cy.nodes('[nodeType = "entity"]').forEach(function(entityNode) {
+    const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
+    const propNodes = propEdges.connectedNodes('[nodeType = "property"]');
+    
+    if (propNodes.length > 0) {
+      const centerPos = entityNode.position();
+      const radius = 40;
+      const angleStep = (2 * Math.PI) / propNodes.length;
+      
+      propNodes.forEach(function(propNode, index) {
+        const angle = angleStep * index;
+        const x = centerPos.x + radius * Math.cos(angle);
+        const y = centerPos.y + radius * Math.sin(angle);
+        propNode.position({ x: x, y: y });
+      });
+    }
+  });
+  
+  // Final fit
+  console.log('Starting final fit section...');
+  try {
+    console.log('About to call cy.fit...');
+    if (cy && cy.elements().length > 0) {
+      cy.fit(cy.elements(), 80);
+      console.log('cy.fit completed successfully');
+    } else {
+      console.log('Skipping cy.fit - no elements or no cy instance');
+    }
+    console.log('Database schema positioning complete');
+    
+    // Debug: Check if site node is visible after positioning
+    const siteNode = cy.$('#site_6486');
+    if (siteNode.length > 0) {
+      const pos = siteNode.position();
+      const visible = siteNode.visible();
+      const style = siteNode.style();
+      console.log('Site node after positioning:', {
+        id: siteNode.id(),
+        position: pos,
+        visible: visible,
+        display: style.display,
+        opacity: style.opacity
+      });
+    } else {
+      console.log('Site node not found in cytoscape!');
+    }
+    
+    // Force all nodes to be visible and fit view
+    setTimeout(() => {
+      console.log('Final check: ensuring all nodes are visible...');
+      if (cy) {
+        cy.nodes().show();
+        cy.edges().show();
+        cy.fit(cy.elements(), 50);
+        console.log('All nodes should now be visible');
+      }
+    }, 200);
+  } catch (error) {
+    console.error('Error in final positioning steps:', error);
+  }
+}
+
 function render(graph){
   status('rendering…');
   const {nodes, edges} = makeElements(graph);
   if (cy) { cy.destroy(); }
 
-  // Ensure dagre is available and registered
-  if (typeof dagre !== 'undefined' && typeof cytoscape !== 'undefined') {
-    try {
-      cytoscape.use(dagre);
-    } catch (e) {
-      // dagre already registered
-    }
+  console.log('=== RENDER DEBUG ===');
+  console.log('Input nodes:', graph.nodes?.length || 0);
+  console.log('Generated nodes:', nodes.length);
+  console.log('Generated edges:', edges.length);
+  
+  // Log some example nodes to see their structure
+  if (nodes.length > 0) {
+    console.log('First 3 nodes:', nodes.slice(0, 3));
   }
 
   cy = cytoscape({
     container: document.getElementById('cy'),
     elements: { nodes, edges },
-    layout: getLayoutOptions(document.getElementById('layoutSelect')?.value || 'dagre'),
+    layout: getLayoutOptions(document.getElementById('layoutSelect')?.value || 'database-schema'),
     wheelSensitivity: 2.0,
     style: [
       // Entity nodes (main nodes with boxes)
@@ -745,7 +909,8 @@ function render(graph){
         'label':'data(label)', 'font-size':'11px', 'text-wrap':'wrap','text-max-width':'140px',
         'width': 'label', 'height': 'label', 'padding':'12px',
         'color':'#000000', 'text-valign':'center', 'text-halign':'center',
-        'min-width':'80px', 'min-height':'40px'
+        'min-width':'80px', 'min-height':'40px',
+        'font-weight': 'bold' // Make the entire label bold for better visibility
       }},
       // Property nodes (text only, no box)
       { selector:'node[nodeType = "property"]', style:{
@@ -786,6 +951,46 @@ function render(graph){
     ]
   });
 
+  console.log('=== CYTOSCAPE CREATED ===');
+  console.log('Cytoscape nodes count:', cy.nodes().length);
+  console.log('Cytoscape edges count:', cy.edges().length);
+  console.log('Entity nodes:', cy.nodes('[nodeType = "entity"]').length);
+  console.log('Property nodes:', cy.nodes('[nodeType = "property"]').length);
+  
+  // Check if any nodes have invalid positions
+  let invalidPositions = 0;
+  cy.nodes().forEach(function(node) {
+    const pos = node.position();
+    if (!pos || (pos.x === 0 && pos.y === 0) || isNaN(pos.x) || isNaN(pos.y)) {
+      invalidPositions++;
+      console.log('Node with invalid position:', node.id(), pos);
+    }
+  });
+  console.log('Nodes with invalid positions:', invalidPositions);
+
+  // Handle database-schema layout post-positioning
+  const selectedLayout = document.getElementById('layoutSelect')?.value || 'database-schema';
+  if (selectedLayout === 'database-schema') {
+    // Use setTimeout to ensure this runs after the layout is applied
+    setTimeout(() => {
+      applyDatabaseSchemaPositioning();
+    }, 100);
+    
+    // Also listen for layoutstop as backup
+    cy.one('layoutstop', function() {
+      applyDatabaseSchemaPositioning();
+    });
+  } else {
+    // For other layouts, ensure all nodes are visible
+    setTimeout(() => {
+      ensureNodesVisible();
+    }, 100);
+    
+    cy.one('layoutstop', function() {
+      ensureNodesVisible();
+    });
+  }
+
   // selection panel
   const sel = document.getElementById('sel');
   const setSel = (html) => sel.innerHTML = html;
@@ -820,7 +1025,21 @@ document.getElementById('file').onchange = async (ev) => {
 document.getElementById('btnLayout').onclick = () => {
   if (!cy) return;
   const selectedLayout = document.getElementById('layoutSelect').value;
-  cy.layout(getLayoutOptions(selectedLayout)).run();
+  const layout = cy.layout(getLayoutOptions(selectedLayout));
+  
+  // Special handling for database-schema layout
+  if (selectedLayout === 'database-schema') {
+    layout.one('layoutstop', function() {
+      applyDatabaseSchemaPositioning();
+    });
+  } else {
+    // For other layouts, ensure all nodes are visible
+    layout.one('layoutstop', function() {
+      ensureNodesVisible();
+    });
+  }
+  
+  layout.run();
 };
 
 document.getElementById('btnPng').onclick = () => {
@@ -829,6 +1048,40 @@ document.getElementById('btnPng').onclick = () => {
   const bgColor = isDark ? '#0b1020' : '#ffffff';
   const png = cy.png({ full:false, scale:2, bg:bgColor });
   const a = document.createElement('a'); a.href = png; a.download = 'sead_instance.png'; a.click();
+};
+
+document.getElementById('btnDebug').onclick = () => {
+  if (!cy) return;
+  console.log('=== MANUAL DEBUG ===');
+  console.log('Total nodes in cytoscape:', cy.nodes().length);
+  console.log('Total edges in cytoscape:', cy.edges().length);
+  
+  // Check for Site nodes specifically
+  const siteNodes = cy.$('node[entity = "Site"]');
+  console.log('Site nodes found:', siteNodes.length);
+  
+  siteNodes.forEach(function(node) {
+    const pos = node.position();
+    console.log('Site node:', {
+      id: node.id(),
+      entity: node.data('entity'),
+      label: node.data('label'),
+      position: pos,
+      visible: node.visible(),
+      style: {
+        display: node.style('display'),
+        opacity: node.style('opacity'),
+        visibility: node.style('visibility')
+      }
+    });
+  });
+  
+  // Force show all nodes and fit
+  console.log('Forcing all nodes visible...');
+  cy.nodes().show();
+  cy.edges().show();
+  cy.fit(cy.elements(), 50);
+  console.log('Debug complete - check if nodes are now visible');
 };
 
 // Search/highlight
