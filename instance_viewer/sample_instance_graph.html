@@ -851,8 +851,8 @@ async function fetchSample() {
   try {
     fetchSampleButton.disabled = true;
     fetchSampleButton.textContent = 'Fetching...';
-    
-    const response = await fetch(`/sample/${encodeURIComponent(sampleKey)}`);
+    let url = `https://supersead.humlab.umu.se/postgrest/rpc/get_sample_graph?sample_id=${encodeURIComponent(sampleKey)}`;
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
