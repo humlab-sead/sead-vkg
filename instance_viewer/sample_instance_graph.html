@@ -98,7 +98,10 @@
       <label class="chip">
         <input type="checkbox" id="chkHideEdgeLabels"> Hide edge labels
       </label>
-      <input id="q" type="text" placeholder="Search node text… (regex ok)" />
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input id="sampleKey" type="text" placeholder="Enter sample key..." style="flex: 1;" />
+        <button id="fetchSample" type="button" style="padding: 8px 16px; background: #007ACC; color: white; border: none; border-radius: 4px; cursor: pointer;">Fetch Sample</button>
+      </div>
     </div>
 
     <div class="main-area">
@@ -132,7 +135,7 @@
       </div>
     </div>
 
-    <div class="footer">Layout: Database Schema (fixed positions). Drag to rearrange; use Search to highlight matches. PNG export renders the current viewport.
+    <div class="footer">Layout: Database Schema (fixed positions). Drag to rearrange; Enter sample key and fetch to load data. PNG export renders the current viewport.
     </div>
   </div>
 
@@ -304,10 +307,6 @@ function buildLegendAndFilters(graph){
   // Remove 'Property' from entity set since we don't want to filter properties
   entSet.delete('Property');
   
-  console.log('=== BUILDING FILTERS ===');
-  console.log('Input graph nodes:', graph.nodes?.length || 0);
-  console.log('Unique entities found:', [...entSet].sort());
-  
   const filters = document.getElementById('filters');
   if (!filters) {
     console.error('Filters element not found');
@@ -324,25 +323,10 @@ function buildLegendAndFilters(graph){
     const id = 'f_'+ent;
     chip.innerHTML = `<input type="checkbox" id="${id}" checked> <span class="swatch" style="background:${color}"></span> ${ent}`;
     
-    // Debug: Check if Site nodes are found when creating filter
-    if (ent === 'Site') {
-      const siteNodes = cy.$(`node[entity = "Site"]`);
-      console.log(`Creating filter for Site: found ${siteNodes.length} nodes`);
-      siteNodes.forEach(function(node) {
-        console.log('Site node details:', {
-          id: node.id(),
-          position: node.position(),
-          visible: node.visible(),
-          entity: node.data('entity')
-        });
-      });
-    }
-    
     chip.querySelector('input').addEventListener('change', (ev)=>{
       const show = ev.target.checked;
       const sel = `node[entity = "${ent}"]`;
       const nodes = cy.$(sel);
-      console.log(`Filter ${ent}: ${show ? 'showing' : 'hiding'} ${nodes.length} nodes`);
       show ? nodes.show() : nodes.hide();
       
       // Also hide/show connected property nodes
@@ -495,11 +479,6 @@ function getDatabaseSchemaLayout() {
 function applyDatabaseSchemaPositioning() {
   if (!cy) return;
   
-  console.log('=== APPLYING DATABASE SCHEMA POSITIONING ===');
-  console.log('Total nodes:', cy.nodes().length);
-  console.log('Entity nodes:', cy.nodes('[nodeType = "entity"]').length);
-  console.log('Property nodes:', cy.nodes('[nodeType = "property"]').length);
-  
   // Define positions for each entity type
   const positions = {
     // Left column - core hierarchy
@@ -544,7 +523,6 @@ function applyDatabaseSchemaPositioning() {
   // Position all entity nodes
   Object.entries(entityGroups).forEach(([entityType, nodes]) => {
     const basePos = positions[entityType] || { x: 0, y: 500 };
-    console.log(`Positioning ${nodes.length} ${entityType} nodes at base position:`, basePos);
     
     // Special handling for AnalysisValue - sort based on connected Analysis order
     if (entityType === 'AnalysisValue') {
@@ -635,7 +613,6 @@ function applyDatabaseSchemaPositioning() {
         };
       }
       
-      console.log(`Setting ${entityType} node ${node.id()} to position:`, finalPos);
       node.position(finalPos);
     });
   });
@@ -721,20 +698,10 @@ function applyDatabaseSchemaPositioning() {
     }
   });
   
-  console.log('=== POSITIONING COMPLETE ===');
-  
-  // Debug: Check all entity nodes are properly positioned
-  cy.nodes('[nodeType = "entity"]').forEach(function(node) {
-    const pos = node.position();
-    const entity = node.data('entity');
-    console.log(`Final position for ${entity} ${node.id()}:`, pos, `visible: ${node.visible()}`);
-  });
-  
   // Fit the view to show all elements
   setTimeout(() => {
     if (cy && cy.elements().length > 0) {
       cy.fit(cy.elements(), 60);
-      console.log('View fitted to all elements');
     }
   }, 100);
 }
@@ -743,16 +710,6 @@ function render(graph){
   status('rendering…');
   const {nodes, edges} = makeElements(graph);
   if (cy) { cy.destroy(); }
-
-  console.log('=== RENDER DEBUG ===');
-  console.log('Input nodes:', graph.nodes?.length || 0);
-  console.log('Generated nodes:', nodes.length);
-  console.log('Generated edges:', edges.length);
-  
-  // Log some example nodes to see their structure
-  if (nodes.length > 0) {
-    console.log('First 3 nodes:', nodes.slice(0, 3));
-  }
 
   cy = cytoscape({
     container: document.getElementById('cy'),
@@ -767,20 +724,27 @@ function render(graph){
         'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'100px',
         'width': '80px', 'height': '40px', 'padding':'8px',
         'color':'#000000', 'text-valign':'center', 'text-halign':'center',
-        'font-weight': 'bold' // Make the entire label bold for better visibility
+        'font-weight': 'none' // Make the entire label bold for better visibility
       }},
       // Property nodes (text only, no box)
       { selector:'node[nodeType = "property"]', style:{
         'shape':'rectangle',
         'background-color': 'transparent',
+        'background-opacity': 0,
         'border-width': 0,
+        'border-color': 'transparent',
+        'border-opacity': 0,
         'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'120px',
         'width': '20px', 'height': '20px',
         'color': getCSSVar('--ink-dim'), 'text-valign':'center', 'text-halign':'center'
       }},
       // Relationship edges (solid)
       { selector:'edge[edgeType = "relationship"]', style:{
-        'curve-style':'bezier', 'target-arrow-shape':'triangle', 'arrow-scale':0.8,
+        'curve-style':'unbundled-bezier', 
+        'control-point-step-size': 40,
+        'control-point-distances': [40, -40],
+        'control-point-weights': [0.25, 0.75],
+        'target-arrow-shape':'triangle', 'arrow-scale':0.8,
         'width':2, 
         'line-color': getCSSVar('--edge-color'), 
         'target-arrow-color': getCSSVar('--edge-color'),
@@ -789,9 +753,10 @@ function render(graph){
         'text-background-opacity':0.9, 'text-background-padding':'3px',
         'color': getCSSVar('--ink-dim')
       }},
-      // Property edges (dashed)
+      // Property edges (dashed, straight lines)
       { selector:'edge[edgeType = "property"]', style:{
-        'curve-style':'bezier', 'target-arrow-shape':'none',
+        'curve-style':'straight',
+        'target-arrow-shape':'none',
         'width':1, 'line-style':'dashed',
         'line-color': getCSSVar('--muted'), 
         'label':'data(rel)', 'font-size':'8px',
@@ -802,28 +767,18 @@ function render(graph){
         'edge-distances': 'node-position',
         'source-distance-from-node': 5,
         'target-distance-from-node': 5
-      }},
-      { selector:'.highlight', style:{ 'border-width':3, 'border-color': getCSSVar('--accent') }},
-      { selector:'edge.highlight', style:{ 'width':3, 'line-color': getCSSVar('--accent'), 'target-arrow-color': getCSSVar('--accent') }}
+      }}
     ]
   });
 
-  console.log('=== CYTOSCAPE CREATED ===');
-  console.log('Cytoscape nodes count:', cy.nodes().length);
-  console.log('Cytoscape edges count:', cy.edges().length);
-  console.log('Entity nodes:', cy.nodes('[nodeType = "entity"]').length);
-  console.log('Property nodes:', cy.nodes('[nodeType = "property"]').length);
-  
   // Check if any nodes have invalid positions
   let invalidPositions = 0;
   cy.nodes().forEach(function(node) {
     const pos = node.position();
     if (!pos || (pos.x === 0 && pos.y === 0) || isNaN(pos.x) || isNaN(pos.y)) {
       invalidPositions++;
-      console.log('Node with invalid position:', node.id(), pos);
     }
   });
-  console.log('Nodes with invalid positions:', invalidPositions);
 
   // Apply database schema positioning after layout
   setTimeout(() => {
@@ -876,49 +831,55 @@ document.getElementById('btnPng').onclick = () => {
 
 document.getElementById('btnDebug').onclick = () => {
   if (!cy) return;
-  console.log('=== MANUAL DEBUG ===');
-  console.log('Total nodes in cytoscape:', cy.nodes().length);
-  console.log('Total edges in cytoscape:', cy.edges().length);
-  
-  // Check for Site nodes specifically
-  const siteNodes = cy.$('node[entity = "Site"]');
-  console.log('Site nodes found:', siteNodes.length);
-  
-  siteNodes.forEach(function(node) {
-    const pos = node.position();
-    console.log('Site node:', {
-      id: node.id(),
-      entity: node.data('entity'),
-      label: node.data('label'),
-      position: pos,
-      visible: node.visible(),
-      style: {
-        display: node.style('display'),
-        opacity: node.style('opacity'),
-        visibility: node.style('visibility')
-      }
-    });
-  });
-  
   // Force show all nodes and fit
-  console.log('Forcing all nodes visible...');
   cy.nodes().show();
   cy.edges().show();
   cy.fit(cy.elements(), 50);
-  console.log('Debug complete - check if nodes are now visible');
 };
 
-// Search/highlight
-const q = document.getElementById('q');
-q.addEventListener('input', () => {
-  if (!cy) return;
-  cy.$('.highlight').removeClass('highlight');
-  const term = q.value.trim(); if (!term) return;
-  let sel;
-  try { sel = cy.nodes().filter(n => new RegExp(term, 'i').test(n.data('label'))); }
-  catch { sel = cy.nodes().filter(n => (n.data('label')||'').toLowerCase().includes(term.toLowerCase())); }
-  sel.addClass('highlight');
-  cy.edges().filter(e=> sel.contains(e.source()) || sel.contains(e.target())).addClass('highlight');
+// Sample fetching functionality
+const sampleKeyInput = document.getElementById('sampleKey');
+const fetchSampleButton = document.getElementById('fetchSample');
+
+async function fetchSample() {
+  const sampleKey = sampleKeyInput.value.trim();
+  if (!sampleKey) {
+    alert('Please enter a sample key');
+    return;
+  }
+
+  try {
+    fetchSampleButton.disabled = true;
+    fetchSampleButton.textContent = 'Fetching...';
+    
+    const response = await fetch(`/sample/${encodeURIComponent(sampleKey)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const json = await response.json();
+    
+    // Update the JSON textarea
+    const jsonTextarea = document.getElementById('json');
+    jsonTextarea.value = JSON.stringify(json, null, 2);
+    
+    // Trigger the graph refresh using existing load mechanism
+    document.getElementById('btnLoad').click();
+    
+  } catch (error) {
+    console.error('Error fetching sample:', error);
+    alert(`Failed to fetch sample: ${error.message}`);
+  } finally {
+    fetchSampleButton.disabled = false;
+    fetchSampleButton.textContent = 'Fetch Sample';
+  }
+}
+
+fetchSampleButton.addEventListener('click', fetchSample);
+sampleKeyInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    fetchSample();
+  }
 });
 
 // Hide edge labels toggle

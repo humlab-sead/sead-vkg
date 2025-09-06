@@ -1,9 +1,13 @@
---drop function if exists get_sample_graph(p_physical_sample_id int);
 
--- create or replace procedure get_sample_graph(p_physical_sample_id int)
---   returns jsonb as begin
--- $$
-  -- return query
+drop function if exists public.get_sample_graph(p_physical_sample_id int);
+--select get_sample_graph(63815)
+create or replace function public.get_sample_graph(p_physical_sample_id int)
+   returns jsonb language plpgsql
+stable as
+$$
+declare v_data jsonb;
+  begin
+
   with
     ps as (
       select physical_sample_id,
@@ -14,7 +18,7 @@
       from tbl_physical_samples
       join tbl_sample_types using (sample_type_id)
       where TRUE
-        and physical_sample_id = 63815 -- p_physical_sample_id
+        and physical_sample_id = p_physical_sample_id
         --and sample_name = 'A017-005'
     ),
     -- TOTO: add sample dimensions, and sample dimension methods?
@@ -45,10 +49,23 @@
       limit 5
     ),
     tc as (
-      select analysis_entity_id, abundance_id, taxon_id, abundance as "count"
-      from tbl_abundances
-      join ae using (analysis_entity_id)
-      limit 5
+      with identification_level as (
+        select abundance_id, string_agg(identification_level_name, ', ') as identification_level
+        from tbl_abundance_ident_levels 
+        join tbl_identification_levels using (identification_level_id)
+        group by abundance_id
+      ), modification as (
+        select abundance_id, string_agg(modification_type_name, ', ') as modification
+        from tbl_abundance_modifications
+        join tbl_modification_types using (modification_type_id)
+        group by abundance_id
+      )
+        select analysis_entity_id, abundance_id, taxon_id, abundance as "count", identification_level, modification
+        from tbl_abundances
+        join ae using (analysis_entity_id)
+        left join identification_level using (abundance_id)
+        left join modification using (abundance_id)
+        limit 5
     ),
     mv as (
       select measured_value_id, analysis_entity_id, measured_value
@@ -149,14 +166,15 @@
       select jsonb_build_object(
           'nodes', jsonb_agg(node) FILTER (where node is not null),
           'edges', jsonb_agg(edge) FILTER (where edge is not null)
-      )
+      ) into v_data
       from (
         /* nodes */
         select jsonb_build_object(
             'id', 'site_' || si.site_id,
             'entity','Site',
+            'label', site_name,
             'attrs', jsonb_build_object(
-              'name', site_name,
+              -- 'name', site_name,
               'national_id', national_site_identifier,
               'accuracy', site_location_accuracy,
               'coordinate', coordinate
@@ -166,16 +184,18 @@
         select jsonb_build_object(
           'id', 'sg_' || sg.sample_group_id,
           'entity', 'SampleGroup',
+          'label', sample_group_name,
           'attrs', jsonb_build_object(
-            'name', sample_group_name
+            -- 'name', sample_group_name
           )
         ), null::jsonb as edge from sg
         union all
         select jsonb_build_object(
           'id', 'ps_' || ps.physical_sample_id,
           'entity', 'Sample',
+          'label', sample_name,
           'attrs', jsonb_build_object(
-            'name', sample_name,
+            -- 'name', sample_name,
             'type', sample_type
           )
         ), null from ps
@@ -183,14 +203,16 @@
         select jsonb_build_object(
             'id', 'ae_' || ae.analysis_entity_id,
             'entity', 'Analysis',
+            'label', ae.analysis_entity_id::text,
             'attrs', jsonb_build_object()
           ), null from ae
         union all
         select jsonb_build_object(
             'id', 'ds_' || ds.dataset_id,
             'entity', 'Dataset',
+            'label', dataset_name,
             'attrs', jsonb_build_object(
-              'name', dataset_name,
+              -- 'name', dataset_name,
               'master_name', master_name,
               'data_type', data_type
             )
@@ -199,8 +221,9 @@
         select jsonb_build_object(
             'id', 'sl_' || sl.location_id,
             'entity', 'Location',
+            'label', location_name,
             'attrs', jsonb_build_object(
-              'name', location_name,
+              -- 'name', location_name,
               'type', location_type
             )
           ), null from sl
@@ -208,8 +231,9 @@
         select jsonb_build_object(
             'id', 'f_' || f.feature_id,
             'entity', 'Feature',
+            'label', feature_name,
             'attrs', jsonb_build_object(
-              'name', feature_name,
+              -- 'name', feature_name,
               'type', feature_type_name
             )
           ), null from f
@@ -217,20 +241,26 @@
         select jsonb_build_object(
             'id', 'p_' || p.project_id,
             'entity', 'Project',
+            'label', project_name,
             'attrs', jsonb_build_object(
-              'project_name', project_name
+              -- 'project_name', project_name
             )
           ), null from tbl_projects p where project_id in (select project_id from p)
         union all
         select jsonb_build_object(
             'id', 'm_' || m.method_id,
             'entity', 'Method',
-            'attrs', to_jsonb(m)
+            'label', method_name,
+            'attrs', jsonb_build_object(
+              -- 'name', method_name,
+              'type', record_type
+            )
           ), null from m
         union all
         select jsonb_build_object(
               'id', 'b_' || b.biblio_id,
               'entity', 'Bibliography',
+              'label', b.biblio_id::text,
               'attrs', jsonb_build_object(
                 'citation', coalesce(citation, 'null')
               )
@@ -239,6 +269,7 @@
         select jsonb_build_object(
             'id', 'av_' || av.analysis_value_id,
             'entity', 'AnalysisValue',
+            'label', av.analysis_value_id::text,
             'attrs', jsonb_build_object(
               'analysis_value', coalesce(analysis_value, 'null')
               )
@@ -247,8 +278,9 @@
         select jsonb_build_object(
             'id', 'vc_' || vc.value_class_id,
             'entity', 'ValueClass',
+            'label', name,
             'attrs', jsonb_build_object(
-              'name', name,
+              -- 'name', name,
               'value_type', value_type
             )
           ), null from vc
@@ -256,14 +288,18 @@
         select jsonb_build_object(
             'id', 'tc_' || tc.abundance_id,
             'entity', 'TaxonCount',
+            'label', tc.abundance_id::text,
             'attrs', jsonb_build_object(
-              'count', "count"
+              'count', tc."count",
+              'identification_level', tc.identification_level,
+              'modification', tc.modification
             )
           ), null from tc
         union all -- Measured Value
         select jsonb_build_object(
             'id', 'mv_' || mv.measured_value_id,
             'entity', 'MeasuredValue',
+            'label', mv.measured_value_id::text,
             'attrs', jsonb_build_object(
               'value', measured_value
             )
@@ -272,6 +308,7 @@
         select jsonb_build_object(
             'id', 'taxon_' || t.taxon_id,
             'entity', 'Taxon',
+            'label', coalesce(species, 'taxon_' || t.taxon_id),
             'attrs', jsonb_build_object(
               'species', species,
               'genus', genus_name,
@@ -319,5 +356,7 @@
         union all -- Taxon Count to Taxon
         select null, jsonb_build_object('source', 'tc_' || abundance_id,'target', 'taxon_' || taxon_id,'rel', 'of_taxon' ) from tc
       ) t(node, edge);
--- $$
--- end language plpgsql;
+	return v_data;
+end; $$;
+
+GRANT EXECUTE ON FUNCTION public.get_sample_graph(int) TO postgrest_anon;
