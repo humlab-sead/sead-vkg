@@ -1,0 +1,60 @@
+networks:
+  sead_network:  # Define a shared network
+
+services:
+
+  ontop:
+    build:
+      context: ./ontop/docker
+      dockerfile: ontop/docker/Dockerfile
+      image: sead-ontop:latest
+    ports:
+      - "8080:8080"
+    container_name: sead-ontop-vkg
+    depends_on:
+      - postgresql
+    volumes:
+      - ./ontop/models:/opt/ontop/models
+    env_file:
+      - ./ontop/.env
+    environment:
+      ONTOP_MAPPING_FILE: /opt/ontop/models/${DATABASE_NAME}_mapping.obda
+      ONTOP_ONTOLOGY_FILE: /opt/ontop/models/${DATABASE_NAME}_ontology.owl
+      ONTOP_DB_USER: ${DATABASE_READ_ONLY_USER}
+      ONTOP_DB_PASSWORD: ${DATABASE_READ_ONLY_PASSWORD}
+      ONTOP_DB_URL: jdbc:postgresql://postgresql:5432/${DATABASE_NAME}
+      ONTOP_DB_DRIVER: "org.postgresql.Driver"
+      ONTOP_WAIT_FOR: "postgresql:5432"
+      DATABASE_NAME: ${DATABASE_NAME}
+      DOMAIN: ${DOMAIN}
+    networks:
+      - sead_network
+
+# docker run --name=ontop \
+#         --hostname=7667c7394c9a \
+#         --user=ontop \
+#         --volume /home/sead/supersead.humlab.umu.se/ontop/models:/opt/ontop/models \
+#         --volume /tmp \
+#         --env=ONTOP_DB_PASSWORD=0HsN7V6dzGY4MVqQ \
+#         --env=ONTOP_DB_URL=jdbc:postgresql://postgresql:5432/sead_staging \
+#         --env=ONTOP_MAPPING_FILE=/opt/ontop/models/sead_staging_mapping.obda \
+#         --env=DOMAIN=supersead.humlab.umu.se \
+#         --env=ONTOP_DB_DRIVER=org.postgresql.Driver \
+#         --env=DATABASE_NAME=sead_staging \
+#         --env=ONTOP_DB_USER=sead_ro \
+#         --env=ONTOP_WAIT_FOR=postgresql:5432 \
+#         --env=ONTOP_ONTOLOGY_FILE=/opt/ontop/models/sead_staging_ontology.owl \
+#         --network=supersead_sead_network \
+#         --workdir=/opt/ontop \
+#         --expose=8080 \
+#         --expose=8686 \
+#         --label='com.docker.compose.project.working_dir=/home/sead/supersead.humlab.umu.se' \
+#         --label='com.docker.compose.oneoff=False' \
+#         --label='com.docker.compose.image=sha256:0ebd043f8685aa3522b9c0f30540cba787d6266a3f26be7fb07f87350e93d007' \
+#         --label='com.docker.compose.container-number=1' \
+#         --label='com.docker.compose.config-hash=16f24a33652ba3a6e2c5a92a91927e3d22909a079008214f9c5b7a78df95030e' \
+#         --label='com.docker.compose.project.config_files=/home/sead/supersead.humlab.umu.se/docker-compose.yml' \
+#         --label='com.docker.compose.depends_on=postgresql:service_started:false' \
+#         --runtime=runc \
+#         supersead-ontop
+      
