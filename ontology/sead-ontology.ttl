@@ -1,0 +1,190 @@
+#################################################################
+#
+#    The SEAD (Strategic Environmental Archaeology Database) Ontology
+#    Version 1.0
+#
+#################################################################
+
+@prefix :        <http://sead.org/ontology#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+
+# Imported Standard Ontologies
+@prefix crm:     <http://www.cidoc-crm.org/cidoc-crm/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix dwc:     <http://rs.tdwg.org/dwc/terms/> .
+@prefix gsp:     <http://www.opengis.net/ont/geosparql#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+
+#################################################################
+#    Ontology Header
+#################################################################
+
+<http://sead.org/ontology#> rdf:type owl:Ontology ;
+    dcterms:title "The SEAD Ontology"@en ;
+    dcterms:creator "The SEAD Project Team" ;
+    rdfs:comment "A vocabulary for describing archaeological and environmental data from the SEAD database, designed for use with an Ontop-based Virtual Knowledge Graph."@en ;
+    owl:versionInfo "1.0.0" ;
+
+    # This is a critical section. It tells any reasoner or tool (like Ontop)
+    # to also load these standard ontologies.
+    owl:imports <http://www.cidoc-crm.org/cidoc-crm/> ,
+                <http://www.opengis.net/ont/geosparql#> ,
+                <http://rs.tdwg.org/dwc/terms/> ,
+                <http://www.w3.org/2004/02/skos/core#> ,
+                <http://purl.org/dc/terms/> .
+
+#################################################################
+#
+#    Classes
+#
+#################################################################
+
+# --- Core Archaeological and Geographic Classes ---
+
+:Site rdf:type owl:Class ;
+    rdfs:subClassOf crm:E27_Site , gsp:Feature ;
+    rdfs:label "Archaeological Site"@en ;
+    rdfs:comment "A defined location where samples have been collected through excavation or survey."@en .
+
+:Feature rdf:type owl:Class ;
+    rdfs:subClassOf crm:E25_Man-Made_Feature ;
+    rdfs:label "Archaeological Feature"@en ;
+    rdfs:comment "An immovable trace of past human activity, such as a well, hearth, pit, or structure."@en .
+
+:FeatureType rdf:type owl:Class ;
+    rdfs:subClassOf skos:Concept ;
+    rdfs:label "Feature Type"@en ;
+    rdfs:comment "A term from a controlled vocabulary used to classify an archaeological feature."@en .
+
+:Location rdf:type owl:Class ;
+    rdfs:subClassOf gsp:Feature ;
+    rdfs:label "Geographic Location"@en ;
+    rdfs:comment "A named geographical region, such as a country or administrative unit, in which a site is located."@en .
+
+# --- Sampling and Analysis Classes ---
+
+:PhysicalSample rdf:type owl:Class ;
+    rdfs:subClassOf crm:E22_Human-Made_Object ;
+    rdfs:label "Physical Sample"@en ;
+    rdfs:comment "A physical sample collected from a site, belonging to a sample group."@en .
+
+:SampleGroup rdf:type owl:Class ;
+    rdfs:label "Sample Group"@en ;
+    rdfs:comment "A collection of related samples, such as from a core or profile."@en .
+
+:AnalysisEntity rdf:type owl:Class ;
+    rdfs:subClassOf crm:E7_Activity ; # An analysis can be seen as a type of activity
+    rdfs:label "Analysis Entity"@en ;
+    rdfs:comment "A virtual entity linking a physical sample to a specific dataset or analysis."@en .
+
+:Dataset rdf:type owl:Class ;
+    rdfs:label "Dataset"@en ;
+    rdfs:comment "A collection of analyses, often using a specific method."@en .
+
+:Method rdf:type owl:Class ;
+    rdfs:label "Method"@en ;
+    rdfs:comment "An analysis, sampling, or dating method."@en .
+
+# --- Biological and Chronological Classes ---
+
+:Taxon rdf:type owl:Class ;
+    rdfs:subClassOf dwc:Taxon ;
+    rdfs:label "Taxon"@en ;
+    rdfs:comment "A biological taxon (e.g., species, genus) identified in an analysis."@en .
+
+# Note: We map directly to dwc:Occurrence and crm:E16_Measurement in the OBDA file,
+# so we don't need to declare our own abundance or measurement classes.
+# The `owl:imports` statement makes these standard classes available.
+
+:RelativeAgeAssignment rdf:type owl:Class ;
+    rdfs:label "Relative Age Assignment"@en ;
+    rdfs:comment "An assignment of a relative age (e.g., 'Bronze Age') to a sample."@en .
+
+
+#################################################################
+#
+#    Object Properties (Relationships between entities)
+#
+#################################################################
+
+:isLocatedIn rdf:type owl:ObjectProperty ;
+    rdfs:subPropertyOf crm:P89_falls_within ;
+    rdfs:domain :Site ;
+    rdfs:range :Location ;
+    rdfs:label "is located in"@en .
+
+:wasTakenFrom rdf:type owl:ObjectProperty ;
+    rdfs:subPropertyOf crm:P53_has_former_or_current_location ;
+    rdfs:domain :PhysicalSample ;
+    rdfs:range :Feature ;
+    rdfs:label "was taken from"@en .
+
+:hasSampleGroup rdf:type owl:ObjectProperty ;
+    rdfs:domain :Site ;
+    rdfs:range :SampleGroup ;
+    rdfs:label "has sample group"@en .
+
+:hasSample rdf:type owl:ObjectProperty ;
+    rdfs:domain :SampleGroup ;
+    rdfs:range :PhysicalSample ;
+    rdfs:label "has sample"@en .
+
+:hasAnalysisEntity rdf:type owl:ObjectProperty ;
+    rdfs:domain :PhysicalSample ;
+    rdfs:range :AnalysisEntity ;
+    rdfs:label "has analysis entity"@en .
+
+:partOfDataset rdf:type owl:ObjectProperty ;
+    rdfs:domain :AnalysisEntity ;
+    rdfs:range :Dataset ;
+    rdfs:label "part of dataset"@en .
+
+:usesMethod rdf:type owl:ObjectProperty ;
+    rdfs:subPropertyOf crm:P33_used_technique ;
+    rdfs:domain :Dataset ;
+    rdfs:range :Method ;
+    rdfs:label "uses method"@en .
+
+
+#################################################################
+#
+#    Datatype Properties (Attributes with literal values)
+#
+#################################################################
+
+:siteName rdf:type owl:DatatypeProperty ;
+    rdfs:subPropertyOf dcterms:title ;
+    rdfs:domain :Site ;
+    rdfs:range xsd:string ;
+    rdfs:label "site name"@en .
+
+:featureName rdf:type owl:DatatypeProperty ;
+    rdfs:subPropertyOf dcterms:title ;
+    rdfs:domain :Feature ;
+    rdfs:range xsd:string ;
+    rdfs:label "feature name"@en .
+
+:sampleName rdf:type owl:DatatypeProperty ;
+    rdfs:subPropertyOf dcterms:title ;
+    rdfs:domain :PhysicalSample ;
+    rdfs:range xsd:string ;
+    rdfs:label "sample name"@en .
+
+:latitude rdf:type owl:DatatypeProperty ;
+    rdfs:domain :Site ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "latitude"@en .
+
+:longitude rdf:type owl:DatatypeProperty ;
+    rdfs:domain :Site ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "longitude"@en .
+
+:relativeAgeName rdf:type owl:DatatypeProperty ;
+    rdfs:subPropertyOf dcterms:title ;
+    rdfs:domain :RelativeAgeAssignment ;
+    rdfs:range xsd:string ;
+    rdfs:label "relative age name"@en .
