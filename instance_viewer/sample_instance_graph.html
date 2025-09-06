@@ -720,7 +720,7 @@ function render(graph){
       { selector:'node[nodeType = "entity"]', style:{
         'shape':'ellipse',
         'background-color': n => (palette[n.data('entity')] || getCSSVar('--chip')),
-        'border-width': 2, 'border-color': getCSSVar('--border'),
+        'border-width': 0,
         'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'100px',
         'width': '80px', 'height': '40px', 'padding':'8px',
         'color':'#000000', 'text-valign':'center', 'text-halign':'center',
@@ -736,14 +736,14 @@ function render(graph){
         'border-opacity': 0,
         'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'120px',
         'width': '20px', 'height': '20px',
-        'color': getCSSVar('--ink-dim'), 'text-valign':'center', 'text-halign':'center'
+        'color': getCSSVar('--ink'), 'text-valign':'center', 'text-halign':'center'
       }},
       // Relationship edges (solid)
       { selector:'edge[edgeType = "relationship"]', style:{
         'curve-style':'unbundled-bezier', 
         'control-point-step-size': 40,
-        'control-point-distances': [40, -40],
-        'control-point-weights': [0.25, 0.75],
+        'control-point-distances': [30],
+        'control-point-weights': [0.5],
         'target-arrow-shape':'triangle', 'arrow-scale':0.8,
         'width':2, 
         'line-color': getCSSVar('--edge-color'), 
