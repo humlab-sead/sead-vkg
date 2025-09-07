@@ -578,6 +578,33 @@ function applyDatabaseSchemaPositioning() {
       });
     }
     
+    // Special handling for Taxon - align with connected TaxonCount
+    if (entityType === 'Taxon') {
+      // Get TaxonCount positions after they've been positioned
+      const taxonCountNodes = cy.nodes('[entity = "TaxonCount"]');
+      const taxonCountPositions = {};
+      
+      taxonCountNodes.forEach(function(tcNode) {
+        taxonCountPositions[tcNode.id()] = tcNode.position().y;
+      });
+      
+      // Sort Taxon nodes based on their connected TaxonCount Y position
+      nodes.sort((a, b) => {
+        // Find connected TaxonCount for each Taxon
+        const aConnectedTC = a.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "TaxonCount"]');
+        const bConnectedTC = b.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "TaxonCount"]');
+        
+        const aTCY = aConnectedTC.length > 0 ? 
+          taxonCountPositions[aConnectedTC[0].id()] || basePos.y : basePos.y;
+        const bTCY = bConnectedTC.length > 0 ? 
+          taxonCountPositions[bConnectedTC[0].id()] || basePos.y : basePos.y;
+        
+        return aTCY - bTCY; // Sort by Y position (top to bottom)
+      });
+    }
+    
     nodes.forEach((node, index) => {
       let finalPos;
       
@@ -597,6 +624,24 @@ function applyDatabaseSchemaPositioning() {
           finalPos = {
             x: basePos.x,
             y: avPosition.y // Align Y with connected AnalysisValue
+          };
+        } else {
+          // Fallback to default positioning if no connection found
+          finalPos = {
+            x: basePos.x,
+            y: basePos.y + (index * 120)
+          };
+        }
+      } else if (entityType === 'Taxon') {
+        // For Taxon, align with connected TaxonCount
+        const connectedTC = node.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "TaxonCount"]');
+        
+        if (connectedTC.length > 0) {
+          const tcPosition = connectedTC[0].position();
+          finalPos = {
+            x: basePos.x,
+            y: tcPosition.y // Align Y with connected TaxonCount
           };
         } else {
           // Fallback to default positioning if no connection found
