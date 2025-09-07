@@ -650,6 +650,31 @@ function applyDatabaseSchemaPositioning() {
             y: basePos.y + (index * 120)
           };
         }
+      } else if (entityType === 'Location') {
+        // For Location, distribute radially to the left of Site entity
+        const sitePosition = { x: 0, y: 0 }; // Site position
+        const radius = 180; // Distance from Site
+        const totalNodes = nodes.length;
+        
+        if (totalNodes === 1) {
+          // Single Location node - place directly to the left
+          finalPos = {
+            x: sitePosition.x - radius,
+            y: sitePosition.y
+          };
+        } else {
+          // Multiple Location nodes - distribute in an arc to the left
+          // Create an arc from upper-left to lower-left of Site
+          const arcSpan = Math.PI * 0.6; // 108 degrees arc
+          const startAngle = Math.PI - (arcSpan / 2); // Start from upper-left
+          const angleStep = arcSpan / (totalNodes - 1);
+          const angle = startAngle + (index * angleStep);
+          
+          finalPos = {
+            x: sitePosition.x + radius * Math.cos(angle),
+            y: sitePosition.y + radius * Math.sin(angle)
+          };
+        }
       } else {
         // Default: spread vertically downward
         finalPos = {
