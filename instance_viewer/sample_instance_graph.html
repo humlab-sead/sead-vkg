@@ -902,7 +902,7 @@ function render(graph){
         'text-background-opacity':0.9, 'text-background-padding':'3px',
         'color': getCSSVar('--ink-dim')
       }},
-      // Bibliography-Dataset edges (S-shaped)
+      // Bibliography-Dataset edges (C-shaped bend to the left)
       { selector: function(ele) {
           if (ele.isEdge() && ele.data('edgeType') === 'relationship') {
             const sourceNode = ele.source();
@@ -913,9 +913,9 @@ function render(graph){
           return false;
         }, style:{
         'curve-style':'unbundled-bezier',
-        'control-point-step-size': 60,
-        'control-point-distances': [80, -80],
-        'control-point-weights': [0.25, 0.75],
+        'control-point-step-size': 120,
+        'control-point-distances': [-150],
+        'control-point-weights': [0.5],
         'target-arrow-shape':'triangle', 'arrow-scale':0.8,
         'width':2, 
         'line-color': getCSSVar('--edge-color'), 
