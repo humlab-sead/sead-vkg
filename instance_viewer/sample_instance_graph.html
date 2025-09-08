@@ -605,15 +605,70 @@ function applyDatabaseSchemaPositioning() {
       });
     }
     
+    // Special handling for Method - sort based on connected Dataset order
+    if (entityType === 'Method') {
+      // Get all Dataset nodes and their Y positions
+      const datasetNodes = cy.nodes('[entity = "Dataset"]');
+      const datasetPositions = {};
+      
+      datasetNodes.forEach(function(datasetNode) {
+        datasetPositions[datasetNode.id()] = datasetNode.position().y;
+      });
+      
+      // Sort Method nodes based on their connected Dataset Y position
+      nodes.sort((a, b) => {
+        // Find connected Dataset for each Method
+        const aConnectedDataset = a.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Dataset"]');
+        const bConnectedDataset = b.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Dataset"]');
+        
+        const aDatasetY = aConnectedDataset.length > 0 ? 
+          datasetPositions[aConnectedDataset[0].id()] || basePos.y : basePos.y;
+        const bDatasetY = bConnectedDataset.length > 0 ? 
+          datasetPositions[bConnectedDataset[0].id()] || basePos.y : basePos.y;
+        
+        return aDatasetY - bDatasetY; // Sort by Y position (top to bottom)
+      });
+    }
+    
     nodes.forEach((node, index) => {
       let finalPos;
       
-      if (entityType === 'Bibliography' && nodes.length > 1) {
-        // For multiple Bibliography nodes, position them above the first one
-        finalPos = {
-          x: basePos.x,
-          y: basePos.y - (index * 120) // Move up for additional nodes
-        };
+      if (entityType === 'Bibliography') {
+        // Special positioning for Bibliography based on connections
+        const connectedSite = node.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Site"]');
+        const connectedSampleGroup = node.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "SampleGroup"]');
+        
+        if (connectedSite.length > 0) {
+          // Bibliography connected to Site: align vertically with Site, horizontally with Analysis
+          const sitePosition = connectedSite[0].position();
+          finalPos = {
+            x: 200, // Analysis group X position
+            y: sitePosition.y // Site Y position
+          };
+        } else if (connectedSampleGroup.length > 0) {
+          // Bibliography connected to SampleGroup: align vertically with SampleGroup, horizontally with Analysis
+          const sampleGroupPosition = connectedSampleGroup[0].position();
+          finalPos = {
+            x: 200, // Analysis group X position
+            y: sampleGroupPosition.y // SampleGroup Y position
+          };
+        } else if (nodes.length > 1) {
+          // For multiple Bibliography nodes without specific connections, position them above the first one
+          finalPos = {
+            x: basePos.x,
+            y: basePos.y - (index * 120) // Move up for additional nodes
+          };
+        } else {
+          // Default Bibliography positioning
+          finalPos = {
+            x: basePos.x,
+            y: basePos.y + (index * 120)
+          };
+        }
       } else if (entityType === 'ValueClass') {
         // For ValueClass, align with connected AnalysisValue
         const connectedAV = node.connectedEdges('[edgeType = "relationship"]')
@@ -746,20 +801,45 @@ function applyDatabaseSchemaPositioning() {
         
         propNodes.forEach(function(propNode, index) {
           let x, y;
+          const propertyKey = propNode.data('propertyKey');
           
           if (arrangement === 'left' || arrangement === 'right') {
             // Vertical line to the left or right
             x = centerPos.x + offsetX;
-            y = centerPos.y + startOffset + (index * spacing);
+            
+            // Special handling for master_name and data_type to avoid overlap
+            if (propertyKey === 'master_name') {
+              y = centerPos.y + startOffset + (index * spacing) - 15; // Offset master_name up
+            } else if (propertyKey === 'data_type') {
+              y = centerPos.y + startOffset + (index * spacing) + 8; // Reduced offset for data_type
+            } else {
+              y = centerPos.y + startOffset + (index * spacing);
+            }
           } else if (arrangement === 'above' || arrangement === 'below') {
             // Horizontal line above or below
             x = centerPos.x + startOffset + (index * spacing);
-            y = centerPos.y + offsetY;
+            
+            // Special handling for master_name and data_type to avoid overlap
+            if (propertyKey === 'master_name') {
+              y = centerPos.y + offsetY - 15; // Offset master_name up
+            } else if (propertyKey === 'data_type') {
+              y = centerPos.y + offsetY + 8; // Reduced offset for data_type
+            } else {
+              y = centerPos.y + offsetY;
+            }
           } else if (arrangement === 'northeast') {
             // Diagonal line towards north-east
             const diagonalSpacing = spacing * 0.7; // Reduce spacing for diagonal arrangement
             x = centerPos.x + offsetX + (index * diagonalSpacing * 0.7);
-            y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7);
+            
+            // Special handling for master_name and data_type to avoid overlap
+            if (propertyKey === 'master_name') {
+              y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) - 15; // Offset master_name up
+            } else if (propertyKey === 'data_type') {
+              y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) + 8; // Reduced offset for data_type
+            } else {
+              y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7);
+            }
           }
           
           propNode.position({ x: x, y: y });
@@ -814,6 +894,29 @@ function render(graph){
         'control-point-step-size': 40,
         'control-point-distances': [30],
         'control-point-weights': [0.5],
+        'target-arrow-shape':'triangle', 'arrow-scale':0.8,
+        'width':2, 
+        'line-color': getCSSVar('--edge-color'), 
+        'target-arrow-color': getCSSVar('--edge-color'),
+        'label':'data(rel)', 'font-size':'9px', 
+        'text-background-color': getCSSVar('--panel'),
+        'text-background-opacity':0.9, 'text-background-padding':'3px',
+        'color': getCSSVar('--ink-dim')
+      }},
+      // Bibliography-Dataset edges (S-shaped)
+      { selector: function(ele) {
+          if (ele.isEdge() && ele.data('edgeType') === 'relationship') {
+            const sourceNode = ele.source();
+            const targetNode = ele.target();
+            return (sourceNode.data('entity') === 'Bibliography' && targetNode.data('entity') === 'Dataset') ||
+                   (sourceNode.data('entity') === 'Dataset' && targetNode.data('entity') === 'Bibliography');
+          }
+          return false;
+        }, style:{
+        'curve-style':'unbundled-bezier',
+        'control-point-step-size': 60,
+        'control-point-distances': [80, -80],
+        'control-point-weights': [0.25, 0.75],
         'target-arrow-shape':'triangle', 'arrow-scale':0.8,
         'width':2, 
         'line-color': getCSSVar('--edge-color'), 
