@@ -181,16 +181,10 @@ declare v_data jsonb;
       select biblio_id, case when authors is not null then format('%s (%s).', authors, year) else title end as citation
       from tbl_biblio
       where biblio_id in (
-        select biblio_id from si_b
-        union
-        select biblio_id from ds
-        union
-        select biblio_id
-        from m
-        union
-        select biblio_id from sg_b
-        union
-        select biblio_id from aem)
+        select biblio_id from si_b union
+        select biblio_id from ds union
+        select biblio_id from m union
+        select biblio_id from sg_b)
     ),
     t as (
       select taxon_id, species, genus_name, author_name, family_name
