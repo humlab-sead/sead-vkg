@@ -428,4 +428,23 @@ declare v_data jsonb;
 	return v_data;
 end; $$;
 
+grant execute on function whoami() to postgrest_anon;
+GRANT USAGE ON SCHEMA public TO postgrest_anon;
 GRANT EXECUTE ON FUNCTION public.get_sample_graph(int) TO postgrest_anon;
+NOTIFY pgrst, 'reload schema';
+
+create or replace function public.whoami()
+returns table (user_name text, search_path text)
+language plpgsql
+stable
+as $$
+begin
+  return query
+  select current_user::text, current_setting('search_path')::text;
+end;
+$$;
+
+GRANT USAGE ON SCHEMA public TO postgrest_anon;
+GRANT EXECUTE ON FUNCTION public.whoami() TO postgrest_anon;
+
+NOTIFY pgrst, 'reload schema';
