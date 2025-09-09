@@ -31,7 +31,20 @@ declare v_data jsonb;
         and physical_sample_id = sample_id
         --and sample_name = 'A017-005'
     ),
-    -- TOTO: add sample dimensions, and sample dimension methods?
+    sd as (
+      select sd.sample_dimension_id,
+          sd.physical_sample_id,
+          sd.dimension_value,
+          sd.method_id,
+          format('%s %s', to_char(dimension_value, 'FM999999999990.0999999999999'), d.unit_abbrev) as "value",
+          d.dimension,
+          q.symbol as qualifier
+      from tbl_sample_dimensions sd 
+      join ps using (physical_sample_id)
+      left join du d using (dimension_id)
+      left join tbl_methods m using (method_id)
+      left join tbl_value_qualifiers q using (qualifier_id)
+    ),
     sg as (
       select g.site_id,
              g.sample_group_id,
@@ -234,6 +247,16 @@ declare v_data jsonb;
           )
         ), null from ps
         union all
+		    select jsonb_build_object(
+            'id', 'sd_' || sample_dimension_id,
+            'entity', 'Dimension',
+            'label', "value",
+            'attrs', jsonb_build_object(
+              'dimension', dimension,
+              'qualifier', qualifier
+            )
+          ), null from sd
+		    union all
         select jsonb_build_object(
             'id', 'ae_' || ae.analysis_entity_id,
             'entity', 'Analysis',
@@ -380,7 +403,11 @@ declare v_data jsonb;
         union all -- Analysis to Sample
         select null, jsonb_build_object('source', 'ae_' || ae.analysis_entity_id,'target', 'ps_' || ae.physical_sample_id,'rel', 'from_sample') from ae
         union all -- Analysis to Dataset
-        select null, jsonb_build_object('source', 'ae_' || ae.analysis_entity_id,'target', 'ds_' || ae.dataset_id,'rel', 'in_dataset') from ae
+        select null, jsonb_build_object('source', 'ae_' || ae.analysis_entity_id,'target', 'ds_' || ae.dataset_id,'rel', 'in') from ae
+        union all -- Sample Dimension to Sample
+        select null, jsonb_build_object('source', 'sd_' || sd.sample_dimension_id,'target', 'ps_' || sd.physical_sample_id,'rel', 'of_sample') from sd
+        union all -- Sample Dimension to Method
+        select null, jsonb_build_object('source', 'sd_' || sd.sample_dimension_id,'target', 'm_' || sd.method_id,'rel', 'measured_by') from sd
         union all -- Sample to Feature
         select null, jsonb_build_object('source', 'ps_' || f.physical_sample_id,'target', 'f_' || f.feature_id,'rel', 'has_feature') from f
         union all -- Dataset to Project
