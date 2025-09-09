@@ -10,13 +10,28 @@ declare v_data jsonb;
 
   with
     ps as (
+      with sample_horizon as (
+        select physical_sample_id, string_agg(horizon_name, ', ') as horizon_name
+        from tbl_sample_horizons
+        join tbl_horizons using (horizon_id)
+        group by physical_sample_id
+      ), sample_description as (
+        select physical_sample_id, string_agg(format('%s: %s', type_name, description), ', ') as description
+        from tbl_sample_descriptions
+        join tbl_sample_description_types using (sample_description_type_id)
+        group by physical_sample_id
+      )
       select physical_sample_id,
             type_name as sample_type,
             sample_name,
             alt_ref_type_id,
-            sample_group_id
+            sample_group_id,
+            horizon_name,
+            sample_description.description
       from tbl_physical_samples
       join tbl_sample_types using (sample_type_id)
+      left join sample_horizon using (physical_sample_id) 
+      left join sample_description using (physical_sample_id)
       where TRUE
         and physical_sample_id = p_physical_sample_id
         --and sample_name = 'A017-005'
@@ -222,7 +237,9 @@ declare v_data jsonb;
           'label', sample_name,
           'attrs', jsonb_build_object(
             -- 'name', sample_name,
-            'type', sample_type
+            'type', sample_type,
+            'horizon_name', horizon_name,
+            'description', description
           )
         ), null from ps
         union all
