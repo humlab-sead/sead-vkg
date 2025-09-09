@@ -73,6 +73,32 @@ declare v_data jsonb;
       join ae using (analysis_entity_id)
       limit 5
     ),
+    rd as (
+      select relative_date_id,
+      		 analysis_entity_id,
+      		 relative_age_name,
+    		 case when coalesce(c14_age_older::bigint, c14_age_younger::bigint) is not null then
+        		    format('%s-%s', coalesce(to_char(c14_age_older, 'FM999999999990'), ''), coalesce(to_char(c14_age_younger, 'FM999999999990'), ''))
+              else
+    		        format('%s-%s', coalesce(to_char(cal_age_older, 'FM999999999990'), ''), coalesce(to_char(cal_age_younger, 'FM999999999990'), ''))
+    		 end as dating,
+    		 age_type
+      from tbl_relative_dates rd
+      join tbl_relative_ages ra using (relative_age_id)
+      join tbl_relative_age_types rt using (relative_age_type_id)
+      join ae using (analysis_entity_id)
+    ),
+    gc as (
+    	select geochron_id, analysis_entity_id, lab_number, age::int,
+    		case when coalesce(error_older, error_younger) is null
+    			 then null
+    			 else
+    				json_build_array(error_older::bigint, error_younger::bigint)
+    		end as error, delta_13c, international_lab_id as lab_id, notes
+    	from tbl_geochronology
+    	join tbl_dating_labs using (dating_lab_id)
+        join ae using (analysis_entity_id)		
+    ),
     vc as (
       select value_class_id, c.name, c.method_id, t.name as value_type
       from tbl_value_classes c
@@ -304,6 +330,28 @@ declare v_data jsonb;
               'value', measured_value
             )
           ), null from mv
+		    union all -- Dating
+        select jsonb_build_object(
+            'id', 'rd_' || rd.relative_date_id,
+            'entity', 'Dating',
+            'label', rd.dating::text,
+            'attrs', jsonb_build_object(
+              'age_name', relative_age_name,
+			        'age_type', age_type
+            )
+          ), null from rd
+		    union all -- Geochronology
+        select jsonb_build_object(
+            'id', 'gc_' || geochron_id,
+            'entity', 'Geochronology',
+            'label', age::text,
+            'attrs', jsonb_build_object(
+              'error', error,
+			        'lab_id', lab_id,
+			        'lab_number', lab_number,
+			        'notes', notes
+            )
+          ), null from gc
         union all -- Taxon
         select jsonb_build_object(
             'id', 'taxon_' || t.taxon_id,
@@ -353,6 +401,10 @@ declare v_data jsonb;
         select null, jsonb_build_object('source', 'tc_' || abundance_id,'target', 'ae_' || analysis_entity_id,'rel', 'measured_in' ) from tc
         union all -- Analysis Entity to Measured Value
         select null, jsonb_build_object('source', 'mv_' || measured_value_id,'target', 'ae_' || analysis_entity_id,'rel', 'measured_in' ) from mv
+        union all -- Analysis Entity to Dating
+        select null, jsonb_build_object('source', 'rd_' || relative_date_id,'target', 'ae_' || analysis_entity_id,'rel', 'dated_in' ) from rd
+        union all -- Analysis Entity to Geochronology
+        select null, jsonb_build_object('source', 'gc_' || geochron_id, 'target', 'ae_' || analysis_entity_id,'rel', 'dated_in' ) from gc
         union all -- Taxon Count to Taxon
         select null, jsonb_build_object('source', 'tc_' || abundance_id,'target', 'taxon_' || taxon_id,'rel', 'of_taxon' ) from tc
       ) t(node, edge);
