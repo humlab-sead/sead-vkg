@@ -1,9 +1,4 @@
-
-drop function if exists public.get_sample_graph(p_physical_sample_id int);
---select get_sample_graph(63815)
-create or replace function public.get_sample_graph(p_physical_sample_id int)
-   returns jsonb language plpgsql
-stable as
+create or replace function public.get_sample_graph(sample_id int) returns jsonb language plpgsql stable as
 $$
 declare v_data jsonb;
   begin
@@ -33,7 +28,7 @@ declare v_data jsonb;
       left join sample_horizon using (physical_sample_id) 
       left join sample_description using (physical_sample_id)
       where TRUE
-        and physical_sample_id = p_physical_sample_id
+        and physical_sample_id = sample_id
         --and sample_name = 'A017-005'
     ),
     -- TOTO: add sample dimensions, and sample dimension methods?
@@ -162,7 +157,6 @@ declare v_data jsonb;
       from tbl_analysis_entity_prep_methods
       join ae using (analysis_entity_id)
     ),
-    /* publications */
     m as (
       select method_id, method_name, record_type_name as record_type, biblio_id
       from tbl_methods
@@ -426,7 +420,9 @@ declare v_data jsonb;
         select null, jsonb_build_object('source', 'tc_' || abundance_id,'target', 'taxon_' || taxon_id,'rel', 'of_taxon' ) from tc
       ) t(node, edge);
 	return v_data;
-end; $$;
+end;
+$$;
+
 
 grant execute on function whoami() to postgrest_anon;
 GRANT USAGE ON SCHEMA public TO postgrest_anon;
