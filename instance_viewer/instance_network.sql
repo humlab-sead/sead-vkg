@@ -34,11 +34,13 @@ declare v_data jsonb;
     -- TOTO: add sample dimensions, and sample dimension methods?
     sg as (
       select g.site_id,
-            g.sample_group_id,
-            g.sample_group_name,
-            g.sampling_context_id,
-            g.method_id
+             g.sample_group_id,
+             g.sample_group_name,
+             g.sampling_context_id,
+             g.method_id,
+			       sampling_context
       from tbl_sample_groups g
+	    left join tbl_sample_group_sampling_contexts using (sampling_context_id)
       join ps using (sample_group_id)
     ),
     si as (
@@ -222,6 +224,7 @@ declare v_data jsonb;
           'label', sample_group_name,
           'attrs', jsonb_build_object(
             -- 'name', sample_group_name
+			      'sampling_context', sampling_context
           )
         ), null::jsonb as edge from sg
         union all
