@@ -526,27 +526,42 @@ function applyDatabaseSchemaPositioning() {
   });
   
   if (allAnalysisConnectedNodes.length > 0) {
-    // Get all Analysis nodes and their Y positions for sorting
-    const analysisNodes = cy.nodes('[entity = "Analysis"]');
-    const analysisPositions = {};
+    // First, establish the sort order based on AnalysisValue entities and their connected Analysis Y positions
+    const analysisValueNodes = allAnalysisConnectedNodes.filter(node => node.data('entity') === 'AnalysisValue');
     
-    analysisNodes.forEach(function(analysisNode) {
-      analysisPositions[analysisNode.id()] = analysisNode.position().y;
-    });
+    // Create a map of Analysis ID to sort order based on AnalysisValue connections
+    const analysisSortOrder = {};
+    analysisValueNodes
+      .map(avNode => {
+        const connectedAnalysis = avNode.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Analysis"]');
+        return {
+          avNode: avNode,
+          analysisId: connectedAnalysis.length > 0 ? connectedAnalysis[0].id() : null,
+          analysisY: connectedAnalysis.length > 0 ? connectedAnalysis[0].position().y : 0
+        };
+      })
+      .sort((a, b) => a.analysisY - b.analysisY) // Sort AnalysisValues by their Analysis Y position
+      .forEach((item, index) => {
+        if (item.analysisId) {
+          analysisSortOrder[item.analysisId] = index; // Assign sort order based on AnalysisValue order
+        }
+      });
     
-    // Sort all Analysis-connected nodes based on their connected Analysis Y position
+    // Sort all Analysis-connected nodes based on the AnalysisValue-derived order, ignoring entity type
     allAnalysisConnectedNodes.sort((a, b) => {
       const aConnectedAnalysis = a.connectedEdges('[edgeType = "relationship"]')
         .connectedNodes('[entity = "Analysis"]');
       const bConnectedAnalysis = b.connectedEdges('[edgeType = "relationship"]')
         .connectedNodes('[entity = "Analysis"]');
       
-      const aAnalysisY = aConnectedAnalysis.length > 0 ? 
-        analysisPositions[aConnectedAnalysis[0].id()] || 0 : 0;
-      const bAnalysisY = bConnectedAnalysis.length > 0 ? 
-        analysisPositions[bConnectedAnalysis[0].id()] || 0 : 0;
+      const aAnalysisId = aConnectedAnalysis.length > 0 ? aConnectedAnalysis[0].id() : null;
+      const bAnalysisId = bConnectedAnalysis.length > 0 ? bConnectedAnalysis[0].id() : null;
       
-      return aAnalysisY - bAnalysisY; // Sort by Y position (top to bottom)
+      const aSortOrder = aAnalysisId ? (analysisSortOrder[aAnalysisId] ?? 999) : 999;
+      const bSortOrder = bAnalysisId ? (analysisSortOrder[bAnalysisId] ?? 999) : 999;
+      
+      return aSortOrder - bSortOrder; // Sort by AnalysisValue-derived order, ignoring entity type
     });
     
     // Position all Analysis-connected entities with consistent spacing
