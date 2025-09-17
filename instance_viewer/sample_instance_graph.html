@@ -987,11 +987,16 @@ function applyDatabaseSchemaPositioning() {
         arrangement = 'northeast';
         offsetX = 90; // Increased by 50% from 60
         offsetY = -90; // Increased by 50% from -60
-      } else if (['Sample', 'Site', 'Bibliography'].includes(entityType)) {
+      } else if (['Sample', 'Bibliography'].includes(entityType)) {
         // Position above the entity
         arrangement = 'above';
-        offsetX = 0;
-        offsetY = -120; // Increased by 50% from -80
+        offsetX = 80;
+        offsetY = -80; // Increased by 50% from -80
+      } else if (['Site'].includes(entityType)) {
+        // Position to the northeast of the entity with staggered Y positions to avoid overlap
+        arrangement = 'northeast';
+        offsetX = 90;
+        offsetY = -90;
       } else if (['SampleGroup'].includes(entityType)) {
         // Position to the left of the entity (with special handling for descriptions and sampling_context)
         arrangement = 'samplegroup';
@@ -1000,9 +1005,9 @@ function applyDatabaseSchemaPositioning() {
         console.log(`SampleGroup entity found: ${entityNode.id()}, properties: ${propNodes.length}`);
       } else if (['Dataset', 'AnalysisValue'].includes(entityType)) {
         // Position below the entity
-        arrangement = 'below';
-        offsetX = 0;
-        offsetY = 120; // Increased by 50% from 80
+        arrangement = 'northeast';
+        offsetX = 80;
+        offsetY = -60; // Increased by 50% from 80
       } else if (['Taxon', 'ValueClass'].includes(entityType)) {
         // Position to the right of the entity
         arrangement = 'right';
@@ -1023,7 +1028,8 @@ function applyDatabaseSchemaPositioning() {
         });
       } else {
         // Linear arrangement (left, right, above, below, northeast)
-        const spacing = 35; // spacing between property nodes
+        // Increase spacing for Sample entities as they often have longer property text
+        const spacing = entityType === 'Sample' ? 55 : 35; // increased spacing for Sample entities
         const startOffset = -(propNodes.length - 1) * spacing / 2;
         
         propNodes.forEach(function(propNode, index) {
@@ -1055,17 +1061,32 @@ function applyDatabaseSchemaPositioning() {
               y = centerPos.y + offsetY;
             }
           } else if (arrangement === 'northeast') {
-            // Diagonal line towards north-east
-            const diagonalSpacing = spacing * 0.7; // Reduce spacing for diagonal arrangement
-            x = centerPos.x + offsetX + (index * diagonalSpacing * 0.7);
-            
-            // Special handling for master_name and data_type to avoid overlap
-            if (propertyKey === 'master_name') {
-              y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) - 15; // Offset master_name up
-            } else if (propertyKey === 'data_type') {
-              y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) + 8; // Reduced offset for data_type
+            // Special handling for Site entities - cascade from above to southeast
+            if (entityType === 'Site') {
+              if (index === 0) {
+                // First property directly above the Site
+                x = centerPos.x;
+                y = centerPos.y + offsetY;
+              } else {
+                // Subsequent properties cascade to the east and slightly below
+                const cascadeOffsetX = 40; // Horizontal spacing between properties
+                const cascadeOffsetY = 25; // Vertical spacing between properties
+                x = centerPos.x + (index * cascadeOffsetX);
+                y = centerPos.y + offsetY + (index * cascadeOffsetY);
+              }
             } else {
-              y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7);
+              // Default diagonal line towards north-east for other entities
+              const diagonalSpacing = spacing * 0.7; // Reduce spacing for diagonal arrangement
+              x = centerPos.x + offsetX + (index * diagonalSpacing * 0.7);
+              
+              // Special handling for master_name and data_type to avoid overlap
+              if (propertyKey === 'master_name') {
+                y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) - 15; // Offset master_name up
+              } else if (propertyKey === 'data_type') {
+                y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) + 8; // Reduced offset for data_type
+              } else {
+                y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7);
+              }
             }
           } else if (arrangement === 'samplegroup') {
             // Special handling for SampleGroup properties
@@ -1139,8 +1160,8 @@ function render(graph){
         'border-width': 0,
         'border-color': 'transparent',
         'border-opacity': 0,
-        'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'120px',
-        'width': '20px', 'height': '20px',
+        'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'240px',
+        'width': '40px', 'height': '20px',
         'color': getCSSVar('--ink'), 'text-valign':'center', 'text-halign':'center'
       }},
       // Relationship edges (solid)
