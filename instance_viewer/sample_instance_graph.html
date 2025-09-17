@@ -527,29 +527,29 @@ function applyDatabaseSchemaPositioning() {
   });
   
   if (allAnalysisConnectedNodes.length > 0) {
-    // First, establish the sort order based on AnalysisValue entities and their connected Analysis Y positions
-    const analysisValueNodes = allAnalysisConnectedNodes.filter(node => node.data('entity') === 'AnalysisValue');
-    
-    // Create a map of Analysis ID to sort order based on AnalysisValue connections
+    // Get all Analysis nodes and sort them by their Y positions to establish the reference order
+    const analysisNodes = cy.nodes('[entity = "Analysis"]');
     const analysisSortOrder = {};
-    analysisValueNodes
-      .map(avNode => {
-        const connectedAnalysis = avNode.connectedEdges('[edgeType = "relationship"]')
-          .connectedNodes('[entity = "Analysis"]');
-        return {
-          avNode: avNode,
-          analysisId: connectedAnalysis.length > 0 ? connectedAnalysis[0].id() : null,
-          analysisY: connectedAnalysis.length > 0 ? connectedAnalysis[0].position().y : 0
-        };
-      })
-      .sort((a, b) => a.analysisY - b.analysisY) // Sort AnalysisValues by their Analysis Y position
-      .forEach((item, index) => {
-        if (item.analysisId) {
-          analysisSortOrder[item.analysisId] = index; // Assign sort order based on AnalysisValue order
-        }
+    
+    // Create array of Analysis nodes with their Y positions and sort by Y
+    const sortedAnalysisNodes = [];
+    analysisNodes.forEach(function(analysisNode) {
+      sortedAnalysisNodes.push({
+        id: analysisNode.id(),
+        y: analysisNode.position().y
+      });
+    });
+    
+    // Sort Analysis nodes by Y position and assign sort order
+    sortedAnalysisNodes
+      .sort((a, b) => a.y - b.y) // Sort by Y position (top to bottom)
+      .forEach((analysisData, index) => {
+        analysisSortOrder[analysisData.id] = index;
       });
     
-    // Sort all Analysis-connected nodes based on the AnalysisValue-derived order, ignoring entity type
+    console.log('Analysis sort order:', analysisSortOrder);
+    
+    // Sort all Analysis-connected nodes based on their connected Analysis Y order
     allAnalysisConnectedNodes.sort((a, b) => {
       const aConnectedAnalysis = a.connectedEdges('[edgeType = "relationship"]')
         .connectedNodes('[entity = "Analysis"]');
@@ -562,7 +562,9 @@ function applyDatabaseSchemaPositioning() {
       const aSortOrder = aAnalysisId ? (analysisSortOrder[aAnalysisId] ?? 999) : 999;
       const bSortOrder = bAnalysisId ? (analysisSortOrder[bAnalysisId] ?? 999) : 999;
       
-      return aSortOrder - bSortOrder; // Sort by AnalysisValue-derived order, ignoring entity type
+      console.log(`Comparing ${a.data('entity')} ${a.id()} (Analysis: ${aAnalysisId}, order: ${aSortOrder}) vs ${b.data('entity')} ${b.id()} (Analysis: ${bAnalysisId}, order: ${bSortOrder})`);
+      
+      return aSortOrder - bSortOrder; // Sort by Analysis Y order, ignoring entity type
     });
     
     // Position all Analysis-connected entities with consistent spacing
@@ -922,10 +924,11 @@ function applyDatabaseSchemaPositioning() {
         offsetX = 0;
         offsetY = -120; // Increased by 50% from -80
       } else if (['SampleGroup'].includes(entityType)) {
-        // Position to the left of the entity (with special handling for description)
+        // Position to the left of the entity (with special handling for descriptions and sampling_context)
         arrangement = 'samplegroup';
         offsetX = -180;
         offsetY = 0;
+        console.log(`SampleGroup entity found: ${entityNode.id()}, properties: ${propNodes.length}`);
       } else if (['Dataset', 'AnalysisValue'].includes(entityType)) {
         // Position below the entity
         arrangement = 'below';
@@ -997,14 +1000,24 @@ function applyDatabaseSchemaPositioning() {
             }
           } else if (arrangement === 'samplegroup') {
             // Special handling for SampleGroup properties
-            if (propertyKey === 'description') {
-              // Position description far to the left for long text
-              x = centerPos.x - 300; // Far left position for description
-              y = centerPos.y; // Same Y level as the entity
+            console.log(`SampleGroup property: ${propertyKey}, index: ${index}`);
+            if (propertyKey === 'descriptions') {
+              x = centerPos.x - 500; // Far left position for descriptions (increased by 300% from 300)
+              y = centerPos.y + 50; // Same Y level as the entity
+              console.log(`Positioning SampleGroup descriptions at x: ${x}, y: ${y}`);
+            } else if (propertyKey === 'sampling_context') {
+              x = centerPos.x - 350; // Far left position for sampling_context (increased by 300% from 300)
+              y = centerPos.y + 100; // Same Y level as the entity
+              console.log(`Positioning SampleGroup sampling_context at x: ${x}, y: ${y}`);
+            } else if (propertyKey === 'positions') {
+              x = centerPos.x - 500; // Far left position for sampling_context (increased by 300% from 300)
+              y = centerPos.y + 300; // Same Y level as the entity
+              console.log(`Positioning SampleGroup sampling_context at x: ${x}, y: ${y}`);
             } else {
               // Other properties use vertical arrangement to the left
               x = centerPos.x + offsetX; // -180 from the setup
               y = centerPos.y + startOffset + (index * spacing);
+              console.log(`Positioning SampleGroup ${propertyKey} at x: ${x}, y: ${y}`);
             }
           }
           
