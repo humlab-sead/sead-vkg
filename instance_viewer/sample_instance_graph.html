@@ -115,6 +115,11 @@
           <h3>Filters</h3>
           <div class="chips" id="filters"></div>
         </div>
+
+        <div class="panel">
+          <h3>Legend</h3>
+          <div class="legend" id="legend"></div>
+        </div>
       </div>
 
       <div id="cy"></div>
@@ -354,6 +359,35 @@ function buildLegendAndFilters(graph){
     show ? (propNodes.show(), propEdges.show()) : (propNodes.hide(), propEdges.hide());
   });
   filters.appendChild(propChip);
+}
+
+function createLegend(graph){
+  const entSet = new Set((graph.nodes||[]).map(n=>n.entity));
+  // Remove 'Property' from entity set since it has its own entry
+  entSet.delete('Property');
+  
+  const legend = document.getElementById('legend');
+  if (!legend) {
+    console.error('Legend element not found');
+    return;
+  }
+  legend.innerHTML = '';
+  
+  // Add main entity types
+  [...entSet].sort().forEach(ent=>{
+    const color = palette[ent] || '#eee';
+    
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.innerHTML = `<span class="swatch" style="background:${color}"></span> ${ent}`;
+    legend.appendChild(item);
+  });
+  
+  // Add property legend item
+  const propItem = document.createElement('div');
+  propItem.className = 'item';
+  propItem.innerHTML = `<span class="swatch" style="background:#e5e7eb"></span> Properties`;
+  legend.appendChild(propItem);
 }
 
 function attachTooltips(){
@@ -983,6 +1017,7 @@ function render(graph){
 
   // attachTooltips();
   buildLegendAndFilters(graph);
+  createLegend(graph);
   status(`${graph.nodes?.length||0} nodes • ${graph.edges?.filter(e=>e&&e.source&&e.target).length||0} edges`);
 }
 
@@ -1092,6 +1127,15 @@ document.getElementById('btnDemo').onclick = () => {
 
 // Auto-load demo on first open if demo file exists
 window.addEventListener('DOMContentLoaded', async () => {
+  // Initialize edge labels visibility based on checkbox state
+  const hideEdgeLabelsCheckbox = document.getElementById('chkHideEdgeLabels');
+  if (hideEdgeLabelsCheckbox.checked) {
+    // Apply the initial state once graph is loaded
+    setTimeout(() => {
+      toggleEdgeLabels(true);
+    }, 200);
+  }
+  
   const demoLoaded = await loadDemoData();
   if (demoLoaded) {
     // Small delay to ensure all scripts are loaded
