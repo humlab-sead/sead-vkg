@@ -497,12 +497,14 @@ function applyDatabaseSchemaPositioning() {
     
     // Center column - Analysis branch
     Analysis: { x: 200, y: 350 },
-    Dataset: { x: 200, y: 590 }, // 120px below the lowest Analysis (350 + 120 for first Analysis + 120 spacing = 590)
-    
-    // Right column - Values (vertically aligned)
-    TaxonCount: { x: 400, y: 200 },
-    AnalysisValue: { x: 400, y: 350 },
-    MeasuredValue: { x: 400, y: 500 },
+    Dataset: { x: 50, y: 590 }, // 120px below the lowest Analysis (350 + 120 for first Analysis + 120 spacing = 590)
+
+    // Right column - Analysis-connected entities (vertically distributed with even spacing)
+    TaxonCount: { x: 400, y: 200 },      // First entity
+    AnalysisValue: { x: 400, y: 320 },   // 120px spacing
+    MeasuredValue: { x: 400, y: 440 },   // 120px spacing  
+    Dating: { x: 400, y: 560 },          // 120px spacing
+    Geochronology: { x: 400, y: 680 },   // 120px spacing
     
     // Far right - Classifications and Taxonomy
     ValueClass: { x: 600, y: 200 },
@@ -526,8 +528,8 @@ function applyDatabaseSchemaPositioning() {
   Object.entries(entityGroups).forEach(([entityType, nodes]) => {
     const basePos = positions[entityType] || { x: 0, y: 500 };
     
-    // Special handling for AnalysisValue - sort based on connected Analysis order
-    if (entityType === 'AnalysisValue') {
+    // Special handling for Analysis-connected entities - sort based on connected Analysis order
+    if (['AnalysisValue', 'TaxonCount', 'MeasuredValue', 'Dating', 'Geochronology'].includes(entityType)) {
       // Get all Analysis nodes and their Y positions
       const analysisNodes = cy.nodes('[entity = "Analysis"]');
       const analysisPositions = {};
@@ -536,9 +538,9 @@ function applyDatabaseSchemaPositioning() {
         analysisPositions[analysisNode.id()] = analysisNode.position().y;
       });
       
-      // Sort AnalysisValue nodes based on their connected Analysis Y position
+      // Sort nodes based on their connected Analysis Y position
       nodes.sort((a, b) => {
-        // Find connected Analysis for each AnalysisValue
+        // Find connected Analysis for each entity
         const aConnectedAnalysis = a.connectedEdges('[edgeType = "relationship"]')
           .connectedNodes('[entity = "Analysis"]');
         const bConnectedAnalysis = b.connectedEdges('[edgeType = "relationship"]')
