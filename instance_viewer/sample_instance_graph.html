@@ -374,6 +374,7 @@ function createLegend(graph){
     console.error('Legend element not found');
     return;
   }
+  
   legend.innerHTML = '';
   
   // Add main entity types
@@ -806,6 +807,31 @@ function applyDatabaseSchemaPositioning() {
     });
   });
   
+  // Special handling for Project entities - position at mean Y of Dataset entities (after Dataset positioning)
+  const projectNodes = cy.nodes('[entity = "Project"]');
+  if (projectNodes.length > 0) {
+    const datasetNodes = cy.nodes('[entity = "Dataset"]');
+    let meanDatasetY = 590; // Default fallback
+    
+    if (datasetNodes.length > 0) {
+      const datasetYPositions = [];
+      datasetNodes.forEach(function(datasetNode) {
+        datasetYPositions.push(datasetNode.position().y);
+      });
+      meanDatasetY = datasetYPositions.reduce((sum, y) => sum + y, 0) / datasetYPositions.length;
+      console.log(`Dataset Y positions:`, datasetYPositions, `Mean:`, meanDatasetY);
+    }
+    
+    projectNodes.forEach(function(projectNode) {
+      const projectPos = positions['Project'] || { x: -250, y: 590 };
+      projectNode.position({
+        x: projectPos.x, // Keep existing X position (-250)
+        y: meanDatasetY   // Set Y to mean of Dataset Y positions
+      });
+      console.log(`Project entity ${projectNode.id()} positioned at mean Dataset Y:`, meanDatasetY);
+    });
+  }
+
   // Position property nodes around their parent entities
   cy.nodes('[nodeType = "entity"]').forEach(function(entityNode) {
     const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
