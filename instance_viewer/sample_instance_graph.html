@@ -450,7 +450,8 @@ function attachTooltips(){
   });
 }
 
-function getDatabaseSchemaLayout() {
+// Basic preset layout configuration - actual positioning is handled by applyDatabaseSchemaPositioning()
+function getBasicPresetLayout() {
   return {
     name: 'preset',
     animate: true,
@@ -458,58 +459,8 @@ function getDatabaseSchemaLayout() {
     fit: true,
     padding: 60,
     positions: function(node) {
-      // Define fixed positions based on entity types
-      const positions = {
-        // Core hierarchy - left side
-        Site: { x: 0, y: 0 },
-        SampleGroup: { x: 0, y: 150 },
-        Sample: { x: 0, y: 300 },
-        
-        // Locations - top left
-        Location: { x: -200, y: -100 },
-        
-        // Analysis branch - center
-        Analysis: { x: 200, y: 250 },
-        Dataset: { x: 200, y: 400 },
-        
-        // Analysis values and classifications - right side
-        AnalysisValue: { x: 400, y: 150 },
-        ValueClass: { x: 600, y: 150 },
-        
-        // Taxonomic data - bottom right
-        TaxonCount: { x: 400, y: 350 },
-        Taxon: { x: 600, y: 350 },
-        
-        // Measured values - bottom center
-        MeasuredValue: { x: 300, y: 400 },
-        
-        // Methods and bibliography - far right
-        Method: { x: 800, y: 0 },
-        Bibliography: { x: 800, y: 100 },
-        
-        // Projects - top right
-        Project: { x: 400, y: -50 }
-      };
-      
-      const nodeType = node.data('nodeType');
-      const entity = node.data('entity');
-      
-      if (nodeType === 'entity') {
-        // Position entity nodes
-        let basePos = positions[entity] || { x: 0, y: 500 };
-        
-        // If multiple nodes of same entity type, we'll spread them out
-        // For now, just return the base position - spreading will be handled after layout
-        return {
-          x: basePos.x,
-          y: basePos.y
-        };
-      } else if (nodeType === 'property') {
-        // Properties will be positioned around their parent entities after the layout runs
-        return { x: 0, y: 0 }; // Temporary position
-      }
-      
-      return { x: 0, y: 0 }; // Default fallback
+      // Return basic positions - will be overridden by applyDatabaseSchemaPositioning()
+      return { x: 0, y: 0 };
     }
   };
 }
@@ -524,7 +475,7 @@ function applyDatabaseSchemaPositioning() {
     Site: { x: 0, y: 0 },
     SampleGroup: { x: 0, y: 200 },
     Sample: { x: 0, y: 400 },
-    Project: { x: 0, y: 710 }, // Aligned with last Dataset (590 + 120 spacing)
+    Project: { x: -250, y: 590 }, // Doubled horizontal distance from Dataset, aligned with lowest Dataset
     
     // Far left - Methods (vertically aligned with Dataset, halfway between Location and Site)
     Method: { x: -120, y: 590 }, // Halfway between Location (-240) and Site (0): (-240 + 0) / 2 = -120, aligned with Dataset y=590
@@ -544,11 +495,11 @@ function applyDatabaseSchemaPositioning() {
     Geochronology: { x: 400, y: 680 },   // 120px spacing
     
     // Far right - Classifications and Taxonomy
-    ValueClass: { x: 600, y: 200 },
-    Taxon: { x: 600, y: 200 }, // Horizontally aligned with TaxonCount
+    ValueClass: { x: 600, y: 320 }, // Aligned with AnalysisValue
+    Taxon: { x: 600, y: 200 }, // Aligned with TaxonCount
     
     // Top right - Bibliography (horizontally aligned with Site, vertically aligned with TaxonCount)
-    Bibliography: { x: 400, y: 0 } // Same X as TaxonCount (400), same Y as Site (0)
+    Bibliography: { x: 400, y: 0 }, // Same X as TaxonCount (400), same Y as Site (0)
   };
   
   // Group entities by type for spreading
@@ -684,12 +635,39 @@ function applyDatabaseSchemaPositioning() {
           .connectedNodes('[entity = "SampleGroup"]');
         
         if (connectedSite.length > 0) {
-          // Bibliography connected to Site: align vertically with Site, horizontally with Analysis
-          const sitePosition = connectedSite[0].position();
-          finalPos = {
-            x: 200, // Analysis group X position
-            y: sitePosition.y // Site Y position
-          };
+          // Bibliography connected to Site: distribute radially to the right of Site
+          const sitePosition = connectedSite[0].position() || { x: 0, y: 0 };
+          const radius = 180; // Distance from Site (same as Location)
+          
+          // Get all Bibliography nodes connected to Site for radial distribution
+          const siteConnectedBibliographies = nodes.filter(n => {
+            const siteConn = n.connectedEdges('[edgeType = "relationship"]')
+              .connectedNodes('[entity = "Site"]');
+            return siteConn.length > 0;
+          });
+          
+          const totalSiteConnected = siteConnectedBibliographies.length;
+          const currentIndexInSiteGroup = siteConnectedBibliographies.indexOf(node);
+          
+          if (totalSiteConnected === 1) {
+            // Single Bibliography node connected to Site - place directly to the right
+            finalPos = {
+              x: sitePosition.x + radius,
+              y: sitePosition.y
+            };
+          } else {
+            // Multiple Bibliography nodes connected to Site - distribute in an arc to the right
+            // Create an arc from upper-right to lower-right of Site
+            const arcSpan = Math.PI * 0.6; // 108 degrees arc (same as Location)
+            const startAngle = -(arcSpan / 2); // Start from upper-right
+            const angleStep = arcSpan / (totalSiteConnected - 1);
+            const angle = startAngle + (currentIndexInSiteGroup * angleStep);
+            
+            finalPos = {
+              x: sitePosition.x + radius * Math.cos(angle),
+              y: sitePosition.y + radius * Math.sin(angle)
+            };
+          }
         } else if (connectedSampleGroup.length > 0) {
           // Bibliography connected to SampleGroup: align vertically with SampleGroup, horizontally with Analysis
           const sampleGroupPosition = connectedSampleGroup[0].position();
@@ -893,6 +871,9 @@ function applyDatabaseSchemaPositioning() {
   setTimeout(() => {
     if (cy && cy.elements().length > 0) {
       cy.fit(cy.elements(), 60);
+      // Show the graph after positioning is complete
+      const cyContainer = document.getElementById('cy');
+      cyContainer.style.visibility = 'visible';
     }
   }, 100);
 }
@@ -902,20 +883,24 @@ function render(graph){
   const {nodes, edges} = makeElements(graph);
   if (cy) { cy.destroy(); }
 
+  // Hide the graph container initially to prevent showing the layout process
+  const cyContainer = document.getElementById('cy');
+  cyContainer.style.visibility = 'hidden';
+
   cy = cytoscape({
-    container: document.getElementById('cy'),
+    container: cyContainer,
     elements: { nodes, edges },
-    layout: getDatabaseSchemaLayout(),
+    // layout: getBasicPresetLayout(),
     style: [
       // Entity nodes (main nodes with boxes)
       { selector:'node[nodeType = "entity"]', style:{
         'shape':'ellipse',
         'background-color': n => (palette[n.data('entity')] || getCSSVar('--chip')),
         'border-width': 0,
-        'label':'data(label)', 'font-size':'10px', 'text-wrap':'wrap','text-max-width':'100px',
-        'width': '80px', 'height': '40px', 'padding':'8px',
+        'label':'data(label)', 'font-size':'12px', 'text-wrap':'wrap','text-max-width':'100px',
+        'width': '90px', 'height': '40px', 'padding':'8px',
         'color':'#000000', 'text-valign':'center', 'text-halign':'center',
-        'font-weight': 'none' // Make the entire label bold for better visibility
+        'font-weight': 'bold'
       }},
       // Property nodes (text only, no box)
       { selector:'node[nodeType = "property"]', style:{
