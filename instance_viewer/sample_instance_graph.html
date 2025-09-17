@@ -894,6 +894,75 @@ function applyDatabaseSchemaPositioning() {
     });
   }
 
+  // Position Analysis-connected entities to align with Analysis mean Y
+  if (typeof allAnalysisConnectedNodes !== 'undefined' && allAnalysisConnectedNodes.length > 0) {
+    // Calculate mean Y position of Analysis entities
+    const analysisNodes = cy.nodes('[entity = "Analysis"]');
+    let totalAnalysisY = 0;
+    analysisNodes.forEach(node => {
+      totalAnalysisY += node.position().y;
+    });
+    const meanAnalysisY = totalAnalysisY / analysisNodes.length;
+    console.log('Analysis entities mean Y:', meanAnalysisY);
+    
+    // Calculate current mean Y of Analysis-connected entities
+    let totalValueY = 0;
+    allAnalysisConnectedNodes.forEach(node => {
+      totalValueY += node.position().y;
+    });
+    const meanValueY = totalValueY / allAnalysisConnectedNodes.length;
+    console.log('Value entities current mean Y:', meanValueY);
+    
+    // Calculate offset to align means
+    const yOffset = meanAnalysisY - meanValueY;
+    console.log('Y offset to align means:', yOffset);
+    
+    // Apply offset to all Analysis-connected entities
+    allAnalysisConnectedNodes.forEach(node => {
+      const currentPos = node.position();
+      const newY = currentPos.y + yOffset;
+      node.position({ x: currentPos.x, y: newY });
+      console.log(`Positioned ${node.data('entity')} ${node.id()} from Y:${currentPos.y} to Y:${newY}`);
+    });
+    
+    console.log('Analysis-connected entities repositioned to align with Analysis mean Y');
+    
+    // Also reposition ValueClass and Taxon entities to follow their connected entities
+    // Reposition ValueClass entities to align with their connected AnalysisValue
+    const valueClassNodes = cy.nodes('[entity = "ValueClass"]');
+    valueClassNodes.forEach(function(vcNode) {
+      const connectedAV = vcNode.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "AnalysisValue"]');
+      
+      if (connectedAV.length > 0) {
+        const avPosition = connectedAV[0].position();
+        const currentPos = vcNode.position();
+        vcNode.position({
+          x: currentPos.x, // Keep X position
+          y: avPosition.y  // Align Y with connected AnalysisValue
+        });
+        console.log(`Repositioned ValueClass ${vcNode.id()} to Y:${avPosition.y} to align with AnalysisValue`);
+      }
+    });
+    
+    // Reposition Taxon entities to align with their connected TaxonCount
+    const taxonNodes = cy.nodes('[entity = "Taxon"]');
+    taxonNodes.forEach(function(taxonNode) {
+      const connectedTC = taxonNode.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "TaxonCount"]');
+      
+      if (connectedTC.length > 0) {
+        const tcPosition = connectedTC[0].position();
+        const currentPos = taxonNode.position();
+        taxonNode.position({
+          x: currentPos.x, // Keep X position
+          y: tcPosition.y  // Align Y with connected TaxonCount
+        });
+        console.log(`Repositioned Taxon ${taxonNode.id()} to Y:${tcPosition.y} to align with TaxonCount`);
+      }
+    });
+  }
+
   // Position property nodes around their parent entities
   cy.nodes('[nodeType = "entity"]').forEach(function(entityNode) {
     const propEdges = entityNode.connectedEdges('[edgeType = "property"]');
