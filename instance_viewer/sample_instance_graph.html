@@ -580,13 +580,73 @@ function applyDatabaseSchemaPositioning() {
     });
   }
 
+  // Special handling for Bibliography entities connected only to Dataset
+  if (entityGroups['Bibliography']) {
+    const projectNodes = cy.nodes('[entity = "Project"]');
+    let projectY = 590; // Default fallback
+    
+    if (projectNodes.length > 0) {
+      projectY = projectNodes[0].position().y;
+    }
+    
+    // Find Bibliography entities connected only to Dataset (not to Site or SampleGroup)
+    const datasetOnlyBibliographies = entityGroups['Bibliography'].filter(biblioNode => {
+      const connectedSite = biblioNode.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "Site"]');
+      const connectedSampleGroup = biblioNode.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "SampleGroup"]');
+      const connectedDataset = biblioNode.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "Dataset"]');
+      
+      // Only connected to Dataset, not to Site or SampleGroup
+      return connectedDataset.length > 0 && connectedSite.length === 0 && connectedSampleGroup.length === 0;
+    });
+    
+    if (datasetOnlyBibliographies.length > 0) {
+      const projectPos = positions['Project'] || { x: -250, y: 590 };
+      const spacing = 120;
+      const startY = projectY + spacing; // Start below Project
+      
+      datasetOnlyBibliographies.forEach((biblioNode, index) => {
+        biblioNode.position({
+          x: projectPos.x, // Same X as Project
+          y: startY + (index * spacing) // Evenly distributed below Project
+        });
+        console.log(`Dataset-only Bibliography entity ${biblioNode.id()} positioned below Project at:`, {x: projectPos.x, y: startY + (index * spacing)});
+      });
+    }
+  }
+
   // Position all entity nodes
   Object.entries(entityGroups).forEach(([entityType, nodes]) => {
     const basePos = positions[entityType] || { x: 0, y: 500 };
     
-    // Skip Analysis-connected entities as they've already been positioned
+    // Skip entities that have already been specially positioned
     if (['AnalysisValue', 'TaxonCount', 'MeasuredValue', 'Dating', 'Geochronology'].includes(entityType)) {
       return; // Skip - already positioned above
+    }
+    
+    // Skip Bibliography entities that are connected only to Dataset (already positioned above)
+    if (entityType === 'Bibliography') {
+      // Filter out Bibliography entities that were positioned above
+      const filteredNodes = nodes.filter(biblioNode => {
+        const connectedSite = biblioNode.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Site"]');
+        const connectedSampleGroup = biblioNode.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "SampleGroup"]');
+        const connectedDataset = biblioNode.connectedEdges('[edgeType = "relationship"]')
+          .connectedNodes('[entity = "Dataset"]');
+        
+        // Keep entities that are NOT only connected to Dataset
+        return !(connectedDataset.length > 0 && connectedSite.length === 0 && connectedSampleGroup.length === 0);
+      });
+      
+      if (filteredNodes.length === 0) {
+        return; // All Bibliography entities were positioned above
+      }
+      
+      // Update nodes to only include the filtered ones
+      nodes = filteredNodes;
     }
     
     // Special handling for ValueClass - align with connected AnalysisValue
@@ -849,33 +909,38 @@ function applyDatabaseSchemaPositioning() {
       if (['Location', 'Project'].includes(entityType)) {
         // Position to the left of the entity
         arrangement = 'left';
-        offsetX = -120;
+        offsetX = -180; // Increased by 50% from -120
         offsetY = 0;
       } else if (['Method'].includes(entityType)) {
         // Position to the north-east (above and right) of the entity
         arrangement = 'northeast';
-        offsetX = 60;
-        offsetY = -60;
+        offsetX = 90; // Increased by 50% from 60
+        offsetY = -90; // Increased by 50% from -60
       } else if (['Sample', 'Site', 'Bibliography'].includes(entityType)) {
         // Position above the entity
         arrangement = 'above';
         offsetX = 0;
-        offsetY = -80;
+        offsetY = -120; // Increased by 50% from -80
+      } else if (['SampleGroup'].includes(entityType)) {
+        // Position to the left of the entity (with special handling for description)
+        arrangement = 'samplegroup';
+        offsetX = -180;
+        offsetY = 0;
       } else if (['Dataset', 'AnalysisValue'].includes(entityType)) {
         // Position below the entity
         arrangement = 'below';
         offsetX = 0;
-        offsetY = 80;
+        offsetY = 120; // Increased by 50% from 80
       } else if (['Taxon', 'ValueClass'].includes(entityType)) {
         // Position to the right of the entity
         arrangement = 'right';
-        offsetX = 120;
+        offsetX = 180; // Increased by 50% from 120
         offsetY = 0;
       }
       
       if (arrangement === 'circle') {
         // Default circular arrangement for other entities
-        const radius = 70;
+        const radius = 105; // Increased by 50% from 70
         const angleStep = (2 * Math.PI) / propNodes.length;
         
         propNodes.forEach(function(propNode, index) {
@@ -929,6 +994,17 @@ function applyDatabaseSchemaPositioning() {
               y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7) + 8; // Reduced offset for data_type
             } else {
               y = centerPos.y + offsetY - (index * diagonalSpacing * 0.7);
+            }
+          } else if (arrangement === 'samplegroup') {
+            // Special handling for SampleGroup properties
+            if (propertyKey === 'description') {
+              // Position description far to the left for long text
+              x = centerPos.x - 300; // Far left position for description
+              y = centerPos.y; // Same Y level as the entity
+            } else {
+              // Other properties use vertical arrangement to the left
+              x = centerPos.x + offsetX; // -180 from the setup
+              y = centerPos.y + startOffset + (index * spacing);
             }
           }
           
