@@ -96,7 +96,7 @@
       <button id="btnPng">Export PNG</button>
       <button id="btnDebug">Debug Nodes</button>
       <label class="chip">
-        <input type="checkbox" id="chkHideEdgeLabels" checked> Hide edge labels
+        <input type="checkbox" id="chkHideEdgeLabels"> Hide edge labels
       </label>
       <div style="display: flex; gap: 8px; align-items: center;">
         <select id="sampleDropdown" style="padding: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--ink); min-width: 200px;">
@@ -512,35 +512,65 @@ function applyDatabaseSchemaPositioning() {
     entityGroups[entity].push(node);
   });
   
+  // Special handling for Analysis-connected entities - position them as a unified group
+  const analysisConnectedTypes = ['TaxonCount', 'AnalysisValue', 'MeasuredValue', 'Dating', 'Geochronology'];
+  const allAnalysisConnectedNodes = [];
+  
+  // Collect all Analysis-connected entities into a single array
+  analysisConnectedTypes.forEach(entityType => {
+    if (entityGroups[entityType]) {
+      entityGroups[entityType].forEach(node => {
+        allAnalysisConnectedNodes.push(node);
+      });
+    }
+  });
+  
+  if (allAnalysisConnectedNodes.length > 0) {
+    // Get all Analysis nodes and their Y positions for sorting
+    const analysisNodes = cy.nodes('[entity = "Analysis"]');
+    const analysisPositions = {};
+    
+    analysisNodes.forEach(function(analysisNode) {
+      analysisPositions[analysisNode.id()] = analysisNode.position().y;
+    });
+    
+    // Sort all Analysis-connected nodes based on their connected Analysis Y position
+    allAnalysisConnectedNodes.sort((a, b) => {
+      const aConnectedAnalysis = a.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "Analysis"]');
+      const bConnectedAnalysis = b.connectedEdges('[edgeType = "relationship"]')
+        .connectedNodes('[entity = "Analysis"]');
+      
+      const aAnalysisY = aConnectedAnalysis.length > 0 ? 
+        analysisPositions[aConnectedAnalysis[0].id()] || 0 : 0;
+      const bAnalysisY = bConnectedAnalysis.length > 0 ? 
+        analysisPositions[bConnectedAnalysis[0].id()] || 0 : 0;
+      
+      return aAnalysisY - bAnalysisY; // Sort by Y position (top to bottom)
+    });
+    
+    // Position all Analysis-connected entities with consistent spacing
+    const baseX = 400;
+    const baseY = 200;
+    const spacing = 120;
+    
+    allAnalysisConnectedNodes.forEach((node, index) => {
+      const finalPos = {
+        x: baseX,
+        y: baseY + (index * spacing)
+      };
+      node.position(finalPos);
+      console.log(`Analysis-connected ${node.data('entity')} entity ${node.id()} positioned at:`, finalPos, `unified index: ${index}`);
+    });
+  }
+
   // Position all entity nodes
   Object.entries(entityGroups).forEach(([entityType, nodes]) => {
     const basePos = positions[entityType] || { x: 0, y: 500 };
     
-    // Special handling for Analysis-connected entities - sort based on connected Analysis order
+    // Skip Analysis-connected entities as they've already been positioned
     if (['AnalysisValue', 'TaxonCount', 'MeasuredValue', 'Dating', 'Geochronology'].includes(entityType)) {
-      // Get all Analysis nodes and their Y positions
-      const analysisNodes = cy.nodes('[entity = "Analysis"]');
-      const analysisPositions = {};
-      
-      analysisNodes.forEach(function(analysisNode) {
-        analysisPositions[analysisNode.id()] = analysisNode.position().y;
-      });
-      
-      // Sort nodes based on their connected Analysis Y position
-      nodes.sort((a, b) => {
-        // Find connected Analysis for each entity
-        const aConnectedAnalysis = a.connectedEdges('[edgeType = "relationship"]')
-          .connectedNodes('[entity = "Analysis"]');
-        const bConnectedAnalysis = b.connectedEdges('[edgeType = "relationship"]')
-          .connectedNodes('[entity = "Analysis"]');
-        
-        const aAnalysisY = aConnectedAnalysis.length > 0 ? 
-          analysisPositions[aConnectedAnalysis[0].id()] || 0 : 0;
-        const bAnalysisY = bConnectedAnalysis.length > 0 ? 
-          analysisPositions[bConnectedAnalysis[0].id()] || 0 : 0;
-        
-        return aAnalysisY - bAnalysisY; // Sort by Y position (top to bottom)
-      });
+      return; // Skip - already positioned above
     }
     
     // Special handling for ValueClass - align with connected AnalysisValue
@@ -1188,15 +1218,6 @@ document.getElementById('btnDemo').onclick = () => {
 
 // Auto-load demo on first open if demo file exists
 window.addEventListener('DOMContentLoaded', async () => {
-  // Initialize edge labels visibility based on checkbox state
-  const hideEdgeLabelsCheckbox = document.getElementById('chkHideEdgeLabels');
-  if (hideEdgeLabelsCheckbox.checked) {
-    // Apply the initial state once graph is loaded
-    setTimeout(() => {
-      toggleEdgeLabels(true);
-    }, 200);
-  }
-  
   const demoLoaded = await loadDemoData();
   if (demoLoaded) {
     // Small delay to ensure all scripts are loaded
