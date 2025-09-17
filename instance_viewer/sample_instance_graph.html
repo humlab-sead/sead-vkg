@@ -241,7 +241,7 @@ function makeElements(graph){
     // Use the label from JSON data, or fall back to ID
     const mainLabel = n.label || n.id;
     // Format: [Entity]\nLabel
-    const nodeLabel = `[${n.entity}]\n${mainLabel}`;
+    const nodeLabel = `${n.entity}\n${mainLabel}`;
     
     nodes.push({
       data: {
