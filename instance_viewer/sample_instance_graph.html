@@ -979,15 +979,14 @@ function applyDatabaseSchemaPositioning() {
       if (['Location', 'Project'].includes(entityType)) {
         // Position to the left of the entity
         arrangement = 'left';
-        offsetX = -180; // Increased by 50% from -120
+        offsetX = -160;
         offsetY = 0;
       } else if (['Method'].includes(entityType)) {
         // Position to the north-east (above and right) of the entity
         arrangement = 'northeast';
-        offsetX = 90; // Increased by 50% from 60
-        offsetY = -90; // Increased by 50% from -60
-      } else if (['Sample', 'Bibliography'].includes(entityType)) {
-        // Position above the entity
+        offsetX = 90;
+        offsetY = -60;
+      } else if (['northeast'].includes(entityType)) {
         arrangement = 'above';
         offsetX = 80;
         offsetY = -80; // Increased by 50% from -80
@@ -1000,8 +999,7 @@ function applyDatabaseSchemaPositioning() {
         // Position to the left of the entity (with special handling for descriptions and sampling_context)
         arrangement = 'samplegroup';
         offsetX = -180;
-        offsetY = 0;
-        console.log(`SampleGroup entity found: ${entityNode.id()}, properties: ${propNodes.length}`);
+        offsetY = 20;
       } else if (['Dataset', 'AnalysisValue'].includes(entityType)) {
         // Position below the entity
         arrangement = 'northeast';
@@ -1010,7 +1008,11 @@ function applyDatabaseSchemaPositioning() {
       } else if (['Taxon', 'ValueClass'].includes(entityType)) {
         // Position to the right of the entity
         arrangement = 'right';
-        offsetX = 180; // Increased by 50% from 120
+        offsetX = 180;
+        offsetY = 0;
+      } else if (['Taxon'].includes(entityType)) {
+        arrangement = 'right';
+        offsetX = 180;
         offsetY = 0;
       }
       
