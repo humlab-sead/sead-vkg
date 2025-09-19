@@ -214,10 +214,7 @@ function toggleEdgeLabels(hide) {
     .style({
       'label': hide ? '' : 'data(rel)'
     })
-    .selector('edge[edgeType = "property"]')
-    .style({
-      'label': hide ? '' : 'data(rel)'
-    })
+    // Note: Property edges (to property values) are not affected by this toggle
     .update();
 }
 
@@ -476,12 +473,11 @@ function applyDatabaseSchemaPositioning() {
     Site: { x: 0, y: 0 },
     SampleGroup: { x: 0, y: 200 },
     Sample: { x: 0, y: 400 },
+    
     Project: { x: -250, y: 590 }, // Doubled horizontal distance from Dataset, aligned with lowest Dataset
     
-    // Far left - Methods (vertically aligned with Dataset, halfway between Location and Site)
     Method: { x: -120, y: 590 }, // Halfway between Location (-240) and Site (0): (-240 + 0) / 2 = -120, aligned with Dataset y=590
     
-    // Locations - aligned with Site
     Location: { x: -240, y: 0 }, // Aligned with Site
     
     // Center column - Analysis branch
@@ -501,6 +497,9 @@ function applyDatabaseSchemaPositioning() {
     
     // Top right - Bibliography (horizontally aligned with Site, vertically aligned with TaxonCount)
     Bibliography: { x: 400, y: 0 }, // Same X as TaxonCount (400), same Y as Site (0)
+
+    Feature: { x: -220, y: 360 },
+    Dimension: { x: -220, y: 460 }
   };
   
   // Group entities by type for spreading
@@ -1092,22 +1091,18 @@ function applyDatabaseSchemaPositioning() {
             // Special handling for SampleGroup properties
             console.log(`SampleGroup property: ${propertyKey}, index: ${index}`);
             if (propertyKey === 'descriptions') {
-              x = centerPos.x - 500; // Far left position for descriptions (increased by 300% from 300)
-              y = centerPos.y + 50; // Same Y level as the entity
-              console.log(`Positioning SampleGroup descriptions at x: ${x}, y: ${y}`);
+              x = centerPos.x - 450; // Far left position for descriptions (increased by 300% from 300)
+              y = centerPos.y + 150; // Same Y level as the entity
             } else if (propertyKey === 'sampling_context') {
-              x = centerPos.x - 350; // Far left position for sampling_context (increased by 300% from 300)
-              y = centerPos.y + 100; // Same Y level as the entity
-              console.log(`Positioning SampleGroup sampling_context at x: ${x}, y: ${y}`);
+              x = centerPos.x - 300; // Far left position for sampling_context (increased by 300% from 300)
+              y = centerPos.y - 10; // Same Y level as the entity
             } else if (propertyKey === 'positions') {
-              x = centerPos.x - 500; // Far left position for sampling_context (increased by 300% from 300)
-              y = centerPos.y + 300; // Same Y level as the entity
-              console.log(`Positioning SampleGroup sampling_context at x: ${x}, y: ${y}`);
+              x = centerPos.x - 350; // Far left position for sampling_context (increased by 300% from 300)
+              y = centerPos.y + 50; // Same Y level as the entity
             } else {
               // Other properties use vertical arrangement to the left
               x = centerPos.x + offsetX; // -180 from the setup
               y = centerPos.y + startOffset + (index * spacing);
-              console.log(`Positioning SampleGroup ${propertyKey} at x: ${x}, y: ${y}`);
             }
           }
           
@@ -1208,9 +1203,11 @@ function render(graph){
         'target-arrow-shape':'none',
         'width':1, 'line-style':'dashed',
         'line-color': getCSSVar('--muted'), 
-        'label':'data(rel)', 'font-size':'8px',
+        'label':'data(rel)',
+        'font-size':'10px',
         'text-background-color': getCSSVar('--panel'),
-        'text-background-opacity':0.7, 'text-background-padding':'2px',
+        'text-background-opacity':0.7,
+        'text-background-padding':'2px',
         'color': getCSSVar('--ink-dim'),
         'opacity': 0.6,
         'edge-distances': 'node-position',
