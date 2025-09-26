@@ -975,38 +975,49 @@ function applyDatabaseSchemaPositioning() {
       let offsetX = 0;
       let offsetY = 0;
       let arrangement = 'circle'; // default
-      
-      if (['Location', 'Project'].includes(entityType)) {
-        // Position to the left of the entity
+      let radius = 100;
+      let circleSteps = propNodes.length;
+      let startAngle = 0;
+      let circleOffset = 0;
+
+      if (['Location', 'Project', 'Dimension'].includes(entityType)) {
         arrangement = 'left';
         offsetX = -160;
         offsetY = 0;
-      } else if (['Method'].includes(entityType)) {
-        // Position to the north-east (above and right) of the entity
+      } else if (['Bibliography', 'Method', 'ValueClass', 'Feature'].includes(entityType)) {
         arrangement = 'northeast';
         offsetX = 90;
         offsetY = -60;
       } else if (['northeast'].includes(entityType)) {
         arrangement = 'above';
-        offsetX = 80;
-        offsetY = -80; // Increased by 50% from -80
+        offsetX = 40;
+        offsetY = -40;
+      } else if (['Sample'].includes(entityType)) {
+        arrangement = 'left';
+        offsetX = -180;
+        offsetY = -20;
       } else if (['Site'].includes(entityType)) {
         // Position to the northeast of the entity with staggered Y positions to avoid overlap
         arrangement = 'northeast';
         offsetX = 90;
         offsetY = -90;
       } else if (['SampleGroup'].includes(entityType)) {
-        // Position to the left of the entity (with special handling for descriptions and sampling_context)
         arrangement = 'samplegroup';
         offsetX = -180;
         offsetY = 20;
       } else if (['Dataset', 'AnalysisValue'].includes(entityType)) {
-        // Position below the entity
-        arrangement = 'northeast';
+        arrangement = 'circle';
         offsetX = 80;
-        offsetY = -60; // Increased by 50% from 80
-      } else if (['Taxon', 'ValueClass'].includes(entityType)) {
-        // Position to the right of the entity
+        offsetY = -60;
+        circleSteps = 20;
+        radius = 110;
+        circleOffset = 1; // start from top-right
+      } else if (['TaxonCount'].includes(entityType)) {
+        arrangement = 'circle';
+        circleSteps = 8;
+        radius = 80;
+        circleOffset = 1; // start from top-right
+      } else if (['Dating'].includes(entityType)) {
         arrangement = 'right';
         offsetX = 180;
         offsetY = 0;
@@ -1015,14 +1026,13 @@ function applyDatabaseSchemaPositioning() {
         offsetX = 180;
         offsetY = 0;
       }
-      
       if (arrangement === 'circle') {
         // Default circular arrangement for other entities
-        const radius = 105; // Increased by 50% from 70
-        const angleStep = (2 * Math.PI) / propNodes.length;
-        
+        const radius = 105;
+        const angleStep = (2 * Math.PI) / circleSteps;
+
         propNodes.forEach(function(propNode, index) {
-          const angle = angleStep * index;
+          const angle = startAngle + angleStep * (index + circleOffset); // start from angleStep to avoid overlap with top
           const x = centerPos.x + radius * Math.cos(angle);
           const y = centerPos.y + radius * Math.sin(angle);
           propNode.position({ x: x, y: y });
@@ -1062,15 +1072,15 @@ function applyDatabaseSchemaPositioning() {
               y = centerPos.y + offsetY;
             }
           } else if (arrangement === 'northeast') {
-            // Special handling for Site entities - cascade from above to southeast
-            if (entityType === 'Site') {
+            // Special handling for Site and Sample entities - cascade from above to southeast
+            if (entityType === 'Site' || entityType === 'Sample' || entityType === 'Dataset' || entityType === 'Method') {
               if (index === 0) {
-                // First property directly above the Site
-                x = centerPos.x;
+                // First property directly above the entity
+                x = centerPos.x + 20;
                 y = centerPos.y + offsetY;
               } else {
                 // Subsequent properties cascade to the east and slightly below
-                const cascadeOffsetX = 40; // Horizontal spacing between properties
+                const cascadeOffsetX = 50; // Horizontal spacing between properties
                 const cascadeOffsetY = 25; // Vertical spacing between properties
                 x = centerPos.x + (index * cascadeOffsetX);
                 y = centerPos.y + offsetY + (index * cascadeOffsetY);

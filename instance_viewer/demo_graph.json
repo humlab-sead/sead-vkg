@@ -2,368 +2,446 @@
   "edges": [
     {
       "rel": "belongs_to",
-      "source": "sg_13952",
-      "target": "site_6486"
+      "source": "sg_13293",
+      "target": "site_4355"
     },
     {
       "rel": "in_group",
-      "source": "ps_63815",
-      "target": "sg_13952"
+      "source": "ps_59714",
+      "target": "sg_13293"
     },
     {
-      "rel": "from_sample",
-      "source": "ae_223424",
-      "target": "ps_63815"
+      "rel": "",
+      "source": "ae_201831",
+      "target": "ps_59714"
     },
     {
-      "rel": "from_sample",
-      "source": "ae_223419",
-      "target": "ps_63815"
+      "rel": "",
+      "source": "ae_212615",
+      "target": "ps_59714"
     },
     {
-      "rel": "in_dataset",
-      "source": "ae_223424",
-      "target": "ds_91919"
+      "rel": "",
+      "source": "ae_221190",
+      "target": "ps_59714"
     },
     {
-      "rel": "in_dataset",
-      "source": "ae_223419",
-      "target": "ds_91914"
+      "rel": "in",
+      "source": "ae_201831",
+      "target": "ds_82902"
+    },
+    {
+      "rel": "in",
+      "source": "ae_212615",
+      "target": "ds_89844"
+    },
+    {
+      "rel": "in",
+      "source": "ae_221190",
+      "target": "ds_91383"
     },
     {
       "rel": "belongs_to",
-      "source": "ds_91914",
-      "target": "p_507"
-    },
-    {
-      "rel": "belongs_to",
-      "source": "ds_91919",
-      "target": "p_507"
+      "source": "ds_91383",
+      "target": "p_506"
     },
     {
       "rel": "produced_by",
-      "source": "ds_91919",
-      "target": "m_175"
+      "source": "ds_82902",
+      "target": "m_155"
     },
     {
       "rel": "produced_by",
-      "source": "ds_91914",
-      "target": "m_175"
+      "source": "ds_89844",
+      "target": "m_3"
+    },
+    {
+      "rel": "produced_by",
+      "source": "ds_91383",
+      "target": "m_174"
     },
     {
       "rel": "uses_method",
-      "source": "sg_13952",
-      "target": "m_175"
+      "source": "sg_13293",
+      "target": "m_61"
     },
     {
       "rel": "has_publication",
-      "source": "site_6486",
-      "target": "b_10738"
-    },
-    {
-      "rel": "has_location",
-      "source": "site_6486",
-      "target": "sl_4588"
-    },
-    {
-      "rel": "has_location",
-      "source": "site_6486",
-      "target": "sl_3969"
-    },
-    {
-      "rel": "has_location",
-      "source": "site_6486",
-      "target": "sl_4610"
-    },
-    {
-      "rel": "has_location",
-      "source": "site_6486",
-      "target": "sl_205"
-    },
-    {
-      "rel": "has_location",
-      "source": "site_6486",
-      "target": "sl_6266"
+      "source": "site_4355",
+      "target": "b_700"
     },
     {
       "rel": "has_publication",
-      "source": "ds_91919",
-      "target": "b_10738"
+      "source": "site_4355",
+      "target": "b_3384"
     },
     {
       "rel": "has_publication",
-      "source": "ds_91914",
-      "target": "b_10738"
+      "source": "site_4355",
+      "target": "b_3464"
+    },
+    {
+      "rel": "has_location",
+      "source": "site_4355",
+      "target": "sl_105"
+    },
+    {
+      "rel": "has_location",
+      "source": "site_4355",
+      "target": "sl_5148"
+    },
+    {
+      "rel": "has_publication",
+      "source": "ds_82902",
+      "target": null
+    },
+    {
+      "rel": "has_publication",
+      "source": "ds_89844",
+      "target": null
+    },
+    {
+      "rel": "has_publication",
+      "source": "ds_91383",
+      "target": null
     },
     {
       "rel": "described_in",
-      "source": "m_175",
+      "source": "m_174",
+      "target": null
+    },
+    {
+      "rel": "described_in",
+      "source": "m_3",
+      "target": null
+    },
+    {
+      "rel": "described_in",
+      "source": "m_61",
+      "target": null
+    },
+    {
+      "rel": "described_in",
+      "source": "m_155",
       "target": null
     },
     {
       "rel": "measured_in",
-      "source": "av_71966",
-      "target": "ae_223419"
+      "source": "tc_132647",
+      "target": "ae_212615"
     },
     {
       "rel": "measured_in",
-      "source": "av_72104",
-      "target": "ae_223424"
+      "source": "tc_132690",
+      "target": "ae_212615"
     },
     {
       "rel": "measured_in",
-      "source": "av_71963",
-      "target": "ae_223419"
+      "source": "tc_132721",
+      "target": "ae_212615"
     },
     {
       "rel": "measured_in",
-      "source": "av_72103",
-      "target": "ae_223424"
+      "source": "tc_132688",
+      "target": "ae_212615"
     },
     {
       "rel": "measured_in",
-      "source": "av_71962",
-      "target": "ae_223419"
+      "source": "tc_132676",
+      "target": "ae_212615"
     },
     {
-      "rel": "of_type",
-      "source": "av_71966",
-      "target": "vc_43"
-    },
-    {
-      "rel": "of_type",
-      "source": "av_72104",
-      "target": "vc_43"
-    },
-    {
-      "rel": "of_type",
-      "source": "av_71963",
-      "target": "vc_42"
-    },
-    {
-      "rel": "of_type",
-      "source": "av_72103",
-      "target": "vc_42"
-    },
-    {
-      "rel": "of_type",
-      "source": "av_71962",
-      "target": "vc_41"
-    },
-    {
-      "rel": "measured_in",
-      "source": "tc_233927",
-      "target": "ae_223424"
+      "rel": "dated_in",
+      "source": "rd_43833",
+      "target": "ae_201831"
     },
     {
       "rel": "of_taxon",
-      "source": "tc_233927",
-      "target": "taxon_47009"
+      "source": "tc_132647",
+      "target": "taxon_28988"
+    },
+    {
+      "rel": "of_taxon",
+      "source": "tc_132690",
+      "target": "taxon_30891"
+    },
+    {
+      "rel": "of_taxon",
+      "source": "tc_132721",
+      "target": "taxon_33894"
+    },
+    {
+      "rel": "of_taxon",
+      "source": "tc_132688",
+      "target": "taxon_30803"
+    },
+    {
+      "rel": "of_taxon",
+      "source": "tc_132676",
+      "target": "taxon_30464"
     }
   ],
   "nodes": [
     {
-      "id": "site_6486",
+      "id": "site_4355",
       "attrs": {
-        "accuracy": "Cultural Heritage site",
         "coordinate": [
-          58.398269,
-          15.082804
+          54.91019,
+          -5.9914627
         ],
-        "national_id": "L2011:9764"
+        "national_id": "D 288088",
+        "record_types": "Other archaeology\nAnimal bones\nExternal plant macro data\nExternal pollen data"
       },
-      "label": "Skänninge Abbey",
+      "label": "Glenarm: Deer Park Farms",
       "entity": "Site"
     },
     {
-      "id": "sg_13952",
-      "attrs": {},
-      "label": "A017-005-Kufe",
+      "id": "sg_13293",
+      "attrs": {
+        "sampling_context": "Archaeological site"
+      },
+      "label": "Deer Park Farm Full List",
       "entity": "SampleGroup"
     },
     {
-      "id": "ps_63815",
+      "id": "ps_59714",
       "attrs": {
-        "type": "Unspecified"
+        "type": "Unspecified",
+        "alt_refs": "Bugs sample code: SAMP005889"
       },
-      "label": "A017-005",
+      "label": "C4016",
       "entity": "Sample"
     },
     {
-      "id": "ae_223424",
+      "id": "ae_201831",
       "attrs": {},
-      "label": "223424",
+      "label": "201831",
       "entity": "Analysis"
     },
     {
-      "id": "ae_223419",
+      "id": "ae_212615",
       "attrs": {},
-      "label": "223419",
+      "label": "212615",
       "entity": "Analysis"
     },
     {
-      "id": "ds_91919",
+      "id": "ae_221190",
+      "attrs": {},
+      "label": "221190",
+      "entity": "Analysis"
+    },
+    {
+      "id": "ds_82902",
       "attrs": {
-        "data_type": "Mixed-method dependent",
-        "master_name": "SciLifelab Ancient DNA"
+        "name": "PERI005008",
+        "data_type": "Uncalibrated dates",
+        "master_name": "Bugs database"
       },
-      "label": "sample_A017-005",
+      "label": "",
       "entity": "Dataset"
     },
     {
-      "id": "ds_91914",
+      "id": "ds_89844",
       "attrs": {
-        "data_type": "Mixed-method dependent",
-        "master_name": "SciLifelab Ancient DNA"
+        "name": "COUN001078",
+        "data_type": "Presence",
+        "master_name": "Bugs database"
       },
-      "label": "library_A017-005-S1L1",
+      "label": "",
       "entity": "Dataset"
     },
     {
-      "id": "sl_4588",
+      "id": "ds_91383",
       "attrs": {
-        "type": "Sub-country administrative region"
+        "name": "simpledate_COUN001078",
+        "data_type": "Composite date",
+        "master_name": "Bugs database"
       },
-      "label": "Östergötlands län",
-      "entity": "Location"
+      "label": "",
+      "entity": "Dataset"
     },
     {
-      "id": "sl_3969",
-      "attrs": {
-        "type": "Sub-country administrative region"
-      },
-      "label": "Östergötland",
-      "entity": "Location"
-    },
-    {
-      "id": "sl_4610",
-      "attrs": {
-        "type": "Sub-country administrative region"
-      },
-      "label": "Mjölby kommun",
-      "entity": "Location"
-    },
-    {
-      "id": "sl_205",
+      "id": "sl_105",
       "attrs": {
         "type": "Country"
       },
-      "label": "Sweden",
+      "label": "Ireland",
       "entity": "Location"
     },
     {
-      "id": "sl_6266",
+      "id": "sl_5148",
       "attrs": {
-        "type": "Sub-country administrative region"
+        "type": "Unprocessed Bugs Transfer"
       },
-      "label": "Skänninge parish",
+      "label": "Antrim",
       "entity": "Location"
     },
     {
-      "id": "p_507",
-      "attrs": {},
-      "label": "SciLifeLab Ancient DNA Unit project 017",
+      "id": "p_506",
+      "attrs": {
+        "type": "Infrastructure",
+        "project_name": "Swedish Biodiversity Data Infrastructure"
+      },
+      "label": "",
       "entity": "Project"
     },
     {
-      "id": "m_175",
+      "id": "m_174",
       "attrs": {
-        "type": "DNA"
+        "name": "Composite chronology",
+        "type": "Dating"
       },
-      "label": "Ancient DNA analysis",
+      "label": "",
       "entity": "Method"
     },
     {
-      "id": "b_10738",
+      "id": "m_3",
       "attrs": {
-        "citation": "Caroline, A.A., Hedvall, R., Lundgren, M. (2020)."
+        "name": "Palaeoentomology",
+        "type": "Insects & similar"
       },
-      "label": "10738",
+      "label": "",
+      "entity": "Method"
+    },
+    {
+      "id": "m_61",
+      "attrs": {
+        "name": "Temporary record",
+        "type": "Undefined"
+      },
+      "label": "",
+      "entity": "Method"
+    },
+    {
+      "id": "m_155",
+      "attrs": {
+        "name": "Archaeological period (unspecified)",
+        "type": "Dating"
+      },
+      "label": "",
+      "entity": "Method"
+    },
+    {
+      "id": "b_3464",
+      "attrs": {
+        "citation": "Kenward, H. K., Hall, A. R., Allison, E. P. & Carrott, J. (2011) (2011)."
+      },
+      "label": "",
       "entity": "Bibliography"
     },
     {
-      "id": "av_71966",
+      "id": "b_3384",
       "attrs": {
-        "analysis_value": "null"
+        "citation": "Kenward, H.K. & Allison, E. (1994) (1994)."
       },
-      "label": "71966",
-      "entity": "AnalysisValue"
+      "label": "",
+      "entity": "Bibliography"
     },
     {
-      "id": "av_72104",
+      "id": "b_700",
       "attrs": {
-        "analysis_value": "null"
+        "citation": "Allison, E. P., Hall, A. R., Kenward, H. K. (1999) (1999)."
       },
-      "label": "72104",
-      "entity": "AnalysisValue"
+      "label": "",
+      "entity": "Bibliography"
     },
     {
-      "id": "av_71963",
+      "id": "tc_132647",
       "attrs": {
-        "analysis_value": "V18a"
+        "count": 1
       },
-      "label": "71963",
-      "entity": "AnalysisValue"
-    },
-    {
-      "id": "av_72103",
-      "attrs": {
-        "analysis_value": "V18a"
-      },
-      "label": "72103",
-      "entity": "AnalysisValue"
-    },
-    {
-      "id": "av_71962",
-      "attrs": {
-        "analysis_value": "null"
-      },
-      "label": "71962",
-      "entity": "AnalysisValue"
-    },
-    {
-      "id": "vc_43",
-      "attrs": {
-        "value_type": "Molecular sex"
-      },
-      "label": "Molecular sex - Rx",
-      "entity": "ValueClass"
-    },
-    {
-      "id": "vc_42",
-      "attrs": {
-        "value_type": "Identifier"
-      },
-      "label": "mtDNA haplogroup",
-      "entity": "ValueClass"
-    },
-    {
-      "id": "vc_41",
-      "attrs": {
-        "value_type": "Identifier"
-      },
-      "label": "Y haplogroup",
-      "entity": "ValueClass"
-    },
-    {
-      "id": "tc_233927",
-      "attrs": {
-        "count": 1,
-        "modification": null,
-        "identification_level": null
-      },
-      "label": "233927",
+      "label": "132647",
       "entity": "TaxonCount"
     },
     {
-      "id": "taxon_47009",
+      "id": "tc_132690",
       "attrs": {
-        "genus": "Homo",
-        "author": null,
-        "family": "Hominidae",
-        "species": "H. sapiens"
+        "count": 3
       },
-      "label": "H. sapiens",
+      "label": "132690",
+      "entity": "TaxonCount"
+    },
+    {
+      "id": "tc_132721",
+      "attrs": {
+        "count": 2
+      },
+      "label": "132721",
+      "entity": "TaxonCount"
+    },
+    {
+      "id": "tc_132688",
+      "attrs": {
+        "count": 4
+      },
+      "label": "132688",
+      "entity": "TaxonCount"
+    },
+    {
+      "id": "tc_132676",
+      "attrs": {
+        "count": 1
+      },
+      "label": "132676",
+      "entity": "TaxonCount"
+    },
+    {
+      "id": "rd_43833",
+      "attrs": {
+        "age_name": "Medieval",
+        "age_type": "Archaeological period"
+      },
+      "label": "1550-400",
+      "entity": "Dating"
+    },
+    {
+      "id": "taxon_30464",
+      "attrs": {
+        "genus": "Phyllodrepa",
+        "family": "STAPHYLINIDAE",
+        "species": "spp."
+      },
+      "label": "spp.",
+      "entity": "Taxon"
+    },
+    {
+      "id": "taxon_28988",
+      "attrs": {
+        "genus": "Dyschirius",
+        "family": "CARABIDAE",
+        "species": "sp."
+      },
+      "label": "sp.",
+      "entity": "Taxon"
+    },
+    {
+      "id": "taxon_30891",
+      "attrs": {
+        "genus": "Lathrobium (s.l.)",
+        "family": "STAPHYLINIDAE",
+        "species": "sp."
+      },
+      "label": "sp.",
+      "entity": "Taxon"
+    },
+    {
+      "id": "taxon_30803",
+      "attrs": {
+        "genus": "Stenus",
+        "family": "STAPHYLINIDAE",
+        "species": "spp."
+      },
+      "label": "spp.",
+      "entity": "Taxon"
+    },
+    {
+      "id": "taxon_33894",
+      "attrs": {
+        "genus": "Galerucella",
+        "family": "CHRYSOMELIDAE",
+        "species": "sp."
+      },
+      "label": "sp.",
       "entity": "Taxon"
     }
   ]
