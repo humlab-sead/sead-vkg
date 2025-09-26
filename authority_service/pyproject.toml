@@ -1,0 +1,19 @@
+[project]
+name = "authority-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.117.1",
+    "psycopg>=3.2.10",
+]
+[dependency-groups]
+dev = [
+    "pylint>=3.3.8",
+    "ruff>=0.13.2",
+    "black>=25.9.0",
+    "pytest >=8.1.1,<9",
+    "pytest-asyncio >=0.22.0,<1",
+    "httpx >=0.24.1,<1"
+]
