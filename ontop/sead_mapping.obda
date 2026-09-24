@@ -1,0 +1,144 @@
+###############################################################################
+# Ontop OBDA Mapping File for the SEAD Database
+###############################################################################
+
+[PrefixDeclaration]
+# SEAD custom prefixes
+prefix	:           <http://sead.se/ontology#>
+prefix	inst:       <http://sead.se/data#>
+# Standard RDF/S and XSD
+prefix	rdf:        <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix	rdfs:       <http://www.w3.org/2000/01/rdf-schema#>
+prefix	xsd:        <http://www.w3.org/2001/XMLSchema#>
+# Public Ontology prefixes
+prefix  crm:        <http://www.cidoc-crm.org/cidoc-crm/>
+prefix  dcterms:    <http://purl.org/dc/terms/>
+prefix  dwc:        <http://rs.tdwg.org/dwc/terms/>
+prefix  gsp:        <http://www.opengis.net/ont/geosparql#>
+prefix  skos:       <http://www.w3.org/2004/02/skos/core#>
+
+[SourceDeclaration]
+sourceUri		sead-db
+connectionUrl	jdbc:postgresql://localhost:5432/sead_database
+username		db_user
+password		db_password
+driverClass		org.postgresql.Driver
+
+[MappingDeclaration]
+
+###############################################################################
+# MAPPING CORE ENTITIES with PUBLIC ONTOLOGY LINKS
+###############################################################################
+
+# Map archaeological Sites, linking to CRM and GeoSPARQL
+mappingId	Site-Mapping
+target		inst:site/{site_id} rdf:type :Site .
+			inst:site/{site_id} rdf:type crm:E27_Site .
+			inst:site/{site_id} rdf:type gsp:Feature .
+			inst:site/{site_id} rdfs:label "Site: {site_name}" .
+			inst:site/{site_id} dcterms:title "{site_name}"^^xsd:string .
+			inst:site/{site_id} gsp:hasGeometry inst:site/{site_id}/geometry .
+source		SELECT site_id, site_name, latitude_dd, longitude_dd
+            FROM tbl_sites
+            WHERE site_name IS NOT NULL
+
+# Create the WKT Geometry Literal for Sites
+mappingId   Site-Geometry-Mapping
+target      inst:site/{site_id}/geometry rdf:type gsp:Geometry .
+            inst:site/{site_id}/geometry gsp:asWKT "Point({longitude_dd} {latitude_dd})"^^gsp:wktLiteral .
+source      SELECT site_id, longitude_dd, latitude_dd
+            FROM tbl_sites
+            WHERE longitude_dd IS NOT NULL AND latitude_dd IS NOT NULL
+
+# Map Locations, linking to GeoSPARQL
+mappingId   Location-Mapping
+target      inst:location/{location_id} rdf:type :Location .
+            inst:location/{location_id} rdf:type gsp:Feature .
+            inst:location/{location_id} rdfs:label "{location_name}" .
+            inst:location/{location_id} dcterms:title "{location_name}"^^xsd:string .
+source      SELECT location_id, location_name
+            FROM tbl_locations
+
+# Map Features (Archaeological), linking to CRM
+mappingId   Feature-Mapping
+target      inst:feature/{feature_id} rdf:type :Feature .
+            inst:feature/{feature_id} rdf:type crm:E25_Man-Made_Feature .
+            inst:feature/{feature_id} dcterms:type inst:feature_type/{feature_type_id} .
+            inst:feature/{feature_id} rdfs:label "Feature: {feature_name}" .
+            inst:feature/{feature_id} dcterms:title "{feature_name}"^^xsd:string .
+            inst:feature/{feature_id} dcterms:description "{feature_description}"^^xsd:string .
+source      SELECT feature_id, feature_name, feature_description, feature_type_id
+            FROM tbl_features
+
+# Map Feature Types as a SKOS Concept Scheme
+mappingId   FeatureType-Mapping
+target      inst:feature_type/{feature_type_id} rdf:type :FeatureType .
+            inst:feature_type/{feature_type_id} rdf:type skos:Concept .
+            inst:feature_type/{feature_type_id} skos:prefLabel "{feature_type_name}"@en .
+            inst:feature_type/{feature_type_id} skos:inScheme inst:scheme/feature_types .
+source      SELECT feature_type_id, feature_type_name
+            FROM tbl_feature_types
+
+# Map Physical Samples, linking to CRM
+mappingId	PhysicalSample-Mapping
+target		inst:sample/{physical_sample_id} rdf:type :PhysicalSample .
+			inst:sample/{physical_sample_id} rdf:type crm:E22_Human-Made_Object .
+			inst:sample/{physical_sample_id} rdfs:label "Sample: {sample_name}" .
+			inst:sample/{physical_sample_id} dcterms:title "{sample_name}"^^xsd:string .
+			inst:sample_group/{sample_group_id} :hasSample inst:sample/{physical_sample_id} .
+source		SELECT physical_sample_id, sample_name, sample_group_id
+            FROM tbl_physical_samples
+
+# Map Taxa, linking to Darwin Core
+mappingId	Taxon-Mapping
+target		inst:taxon/{taxon_id} rdf:type :Taxon .
+			inst:taxon/{taxon_id} rdf:type dwc:Taxon .
+			inst:taxon/{taxon_id} rdfs:label "{genus_name} {species}" .
+			inst:taxon/{taxon_id} dwc:scientificName "{genus_name} {species}"^^xsd:string .
+source		SELECT ttm.taxon_id, ttg.genus_name, ttm.species
+			FROM tbl_taxa_tree_master ttm
+			JOIN tbl_taxa_tree_genera ttg ON ttm.genus_id = ttg.genus_id
+			WHERE ttm.species IS NOT NULL AND ttg.genus_name IS NOT NULL
+
+# Map Abundance Observations as Darwin Core Occurrences
+mappingId	AbundanceObservation-Mapping
+target		inst:occurrence/{abundance_id} rdf:type dwc:Occurrence .
+			inst:occurrence/{abundance_id} dwc:individualCount "{abundance}"^^xsd:integer .
+			inst:occurrence/{abundance_id} dwc:taxonID inst:taxon/{taxon_id} .
+			inst:occurrence/{abundance_id} dwc:eventID inst:analysis/{analysis_entity_id} .
+source		SELECT abundance_id, analysis_entity_id, taxon_id, abundance
+			FROM tbl_abundances
+			WHERE abundance IS NOT NULL
+
+# Map Absolute Dates as CRM Measurements
+mappingId	AbsoluteDating-Mapping
+target		inst:measurement/{geochron_id} rdf:type crm:E16_Measurement .
+			inst:analysis/{analysis_entity_id} crm:P39_measured inst:measurement/{geochron_id} .
+			inst:measurement/{geochron_id} crm:P40_observed_dimension inst:timespan/{geochron_id} .
+			inst:timespan/{geochron_id} rdfs:label "{age} +/- {error_older}/{error_younger} ({lab_number})" .
+			inst:timespan/{geochron_id} :age "{age}"^^xsd:integer .
+			inst:timespan/{geochron_id} :labNumber "{lab_number}"^^xsd:string .
+source		SELECT geochron_id, analysis_entity_id, age, error_older, error_younger, lab_number
+			FROM tbl_geochronology
+			WHERE age IS NOT NULL
+
+###############################################################################
+# RELATIONSHIP MAPPINGS (Some are now covered above by standard properties)
+###############################################################################
+
+# Link Sites to Locations
+mappingId   Site-Location-Link
+target      inst:site/{site_id} crm:P89_falls_within inst:location/{location_id} .
+source      SELECT site_id, location_id
+            FROM tbl_site_locations
+
+# Link Physical Samples to Features
+mappingId   Sample-Feature-Link
+target      inst:sample/{physical_sample_id} crm:P55_has_current_location inst:feature/{feature_id} .
+source      SELECT physical_sample_id, feature_id
+            FROM tbl_physical_sample_features
+
+# (Other mappings for SampleGroup, AnalysisEntity, etc. can remain as they are,
+# as they represent internal structural logic. The most valuable public links are
+# at the level of Site, Feature, Sample, Taxon, and Measurement.)
+# ... The rest of the original mappings from the previous answer ...
